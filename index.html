@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -116,6 +117,7 @@
   .tab[data-cat="english"].active{ background:linear-gradient(135deg, #5AA9E6, #2E7FC7); color:#06141f; }
   .tab[data-cat="bhojpuri"].active{ background:linear-gradient(135deg, #F0954A, #D9722A); color:#241205; }
   .tab[data-cat="bollywood"].active{ background:linear-gradient(135deg, #EC5FA0, #C93E7E); color:#22060f; }
+  .tab[data-cat="bollynew"].active{ background:linear-gradient(135deg, #F45C5C, #C93030); color:#240707; }
   .tab[data-cat="hindi90"].active{ background:linear-gradient(135deg, #9C7BE0, #7A54C4); color:#150a2c; }
   .tab[data-cat="favorites"].active{ background:linear-gradient(135deg, #F4C93E, #D9A61E); color:#241b04; }
 
@@ -162,6 +164,7 @@
   .vinyl-label.c-english{ background:radial-gradient(circle at 35% 30%, #82c3f2, #2E7FC7 55%, #16456f 100%); }
   .vinyl-label.c-bhojpuri{ background:radial-gradient(circle at 35% 30%, #f7b784, #D9722A 55%, #7a3d12 100%); }
   .vinyl-label.c-bollywood{ background:radial-gradient(circle at 35% 30%, #f5a1c8, #C93E7E 55%, #6e1f45 100%); }
+  .vinyl-label.c-bollynew{ background:radial-gradient(circle at 35% 30%, #f79b9b, #C93030 55%, #6b1414 100%); }
   .vinyl-label.c-hindi90{ background:radial-gradient(circle at 35% 30%, #c3aef0, #7A54C4 55%, #3f2b6d 100%); }
   @keyframes spin{ to{ transform:rotate(360deg); } }
 
@@ -171,10 +174,30 @@
 
   /* Video container */
   .video-frame{
-    width:100%; aspect-ratio:16/9; border-radius:14px; overflow:hidden;
-    border:1px solid var(--line); background:#000; margin-bottom:20px;
+    width:100%; height:3px; border-radius:2px; overflow:hidden;
+    opacity:0.001; margin-bottom:4px; pointer-events:none;
   }
   .video-frame iframe{ width:100%; height:100%; border:0; display:block; }
+
+  /* Audio-only visual — replaces the video area with an animated wave */
+  .audio-wave{
+    display:flex; align-items:flex-end; justify-content:center; gap:4px;
+    height:44px; margin-bottom:20px;
+  }
+  .audio-wave span{
+    width:5px; border-radius:3px; background:linear-gradient(180deg, var(--gold-bright), var(--gold));
+    height:8px; transition:background .3s;
+  }
+  .audio-wave.playing span{ animation: waveBounce 1.1s ease-in-out infinite; }
+  .audio-wave span:nth-child(1){ animation-delay:0s; }
+  .audio-wave span:nth-child(2){ animation-delay:0.15s; }
+  .audio-wave span:nth-child(3){ animation-delay:0.3s; }
+  .audio-wave span:nth-child(4){ animation-delay:0.15s; }
+  .audio-wave span:nth-child(5){ animation-delay:0s; }
+  @keyframes waveBounce{
+    0%, 100%{ height:8px; }
+    50%{ height:38px; }
+  }
 
   /* Controls */
   .controls{ display:flex; align-items:center; justify-content:center; gap:14px; }
@@ -270,6 +293,7 @@
   <button class="tab active" data-cat="english">English</button>
   <button class="tab" data-cat="bhojpuri">Bhojpuri</button>
   <button class="tab" data-cat="bollywood">Bollywood</button>
+  <button class="tab" data-cat="bollynew">New Bollywood</button>
   <button class="tab" data-cat="hindi90">90s Hindi</button>
   <button class="tab" data-cat="favorites">★ Favorites</button>
 </div>
@@ -294,6 +318,9 @@
 
   <div class="video-frame">
     <div id="ytPlayer"></div>
+  </div>
+  <div class="audio-wave" id="audioWave">
+    <span></span><span></span><span></span><span></span><span></span>
   </div>
 
   <div id="favEmptyState" class="empty-state" style="display:none;">
@@ -320,10 +347,11 @@
   // Curated public YouTube playlists — each has many songs, so playback
   // never runs out, and shuffle picks a genuinely random track every time.
   const PLAYLISTS = {
-    english:   { name: 'English',   list: 'PLPSCssPYXhWTTcpNZwYoEQWt8Wc8KO0NV' },
-    bhojpuri:  { name: 'Bhojpuri',  list: 'PLNz4YQwT4-GKHmRJq--M9pnuBFlQWhkaw' },
-    bollywood: { name: 'Bollywood', list: 'PLVPrO2TUSZdTwyg4z7Yw17A3Lly_ELWwy' },
-    hindi90:   { name: '90s Hindi', list: 'PLcggtav10zeqaqM2nFaXkjCJe9cFYnZS0' },
+    english:     { name: 'English',        list: 'PLPSCssPYXhWTTcpNZwYoEQWt8Wc8KO0NV' },
+    bhojpuri:    { name: 'Bhojpuri',       list: 'PLNz4YQwT4-GKHmRJq--M9pnuBFlQWhkaw' },
+    bollywood:   { name: 'Bollywood',      list: 'PLVPrO2TUSZdTwyg4z7Yw17A3Lly_ELWwy' },
+    bollynew:    { name: 'New Bollywood',  list: 'PLO7-VO1D0_6NmK47v6tpOcxurcxdW-hZa' },
+    hindi90:     { name: '90s Hindi',      list: 'PLcggtav10zeqaqM2nFaXkjCJe9cFYnZS0' },
   };
 
   const FAV_KEY = 'satyam_music_favorites_v1';
@@ -380,6 +408,7 @@
       els.playBtn.textContent = '❚❚';
       els.vinyl.classList.add('spinning');
       card.classList.add('is-playing');
+      document.getElementById('audioWave').classList.add('playing');
       setStatus('Playing', true);
       const data = player.getVideoData();
       currentVideoId = data.video_id;
@@ -391,6 +420,7 @@
       els.playBtn.textContent = '▶';
       els.vinyl.classList.remove('spinning');
       card.classList.remove('is-playing');
+      document.getElementById('audioWave').classList.remove('playing');
       setStatus('Paused', false);
     } else if (e.data === YT.PlayerState.ENDED) {
       // Unlimited random playback — automatically continue with another track.
@@ -400,6 +430,8 @@
     }
   }
 
+  let loadRequestId = 0; // guards against a late callback from a previous tab switch overriding a newer one
+
   function loadCategory(cat, autoplay) {
     inSearchMode = false;
     hideHint();
@@ -407,6 +439,7 @@
     lastIndex = -1;
     els.favEmpty.style.display = 'none';
     els.videoFrame.style.display = 'block';
+    const myRequestId = ++loadRequestId;
 
     if (!playerReady) { pendingAutoplay = true; return; }
 
@@ -425,13 +458,38 @@
       }
       const ids = favs.map(f => f.id);
       player.cuePlaylist({ playlist: ids, index: 0 });
-      if (autoplay) setTimeout(() => playRandomFromCurrent(), 350);
+      if (autoplay) waitForPlaylistThenPlay(myRequestId, ids.length, 0);
       return;
     }
 
     const pl = PLAYLISTS[cat];
     player.cuePlaylist({ listType: 'playlist', list: pl.list });
-    if (autoplay) setTimeout(() => playRandomFromCurrent(), 500);
+    if (autoplay) waitForPlaylistThenPlay(myRequestId, null, 0, pl.list);
+  }
+
+  // Polls until the player has actually finished loading the intended
+  // playlist (checked via getPlaylistId for named playlists, or the
+  // expected item count for a custom favorites list) before picking a
+  // random track — this is what prevents the previous tab's songs from
+  // playing under the newly-selected tab's name.
+  function waitForPlaylistThenPlay(requestId, expectedCount, attempt, expectedPlaylistId) {
+    if (requestId !== loadRequestId) return; // a newer tab switch has already superseded this one
+    if (!playerReady || !player.getPlaylist) return;
+
+    const list = player.getPlaylist();
+    const idMatches = !expectedPlaylistId || (player.getPlaylistId && player.getPlaylistId() === expectedPlaylistId);
+    const countMatches = expectedCount === null || (list && list.length === expectedCount);
+
+    if (list && list.length && idMatches && countMatches) {
+      playRandomFromCurrent();
+      return;
+    }
+    if (attempt >= 25) {
+      // Gave it ~5 seconds — proceed with whatever loaded rather than getting stuck silently.
+      playRandomFromCurrent();
+      return;
+    }
+    setTimeout(() => waitForPlaylistThenPlay(requestId, expectedCount, attempt + 1, expectedPlaylistId), 200);
   }
 
   function playRandomFromCurrent() {
