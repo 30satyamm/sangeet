@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sangeet — Endless Shuffle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#070c14;
+    --bg-1:#0f1b2e;
+    --surface:#101c30;
+    --surface-2:#17233a;
+    --line: rgba(201,162,39,0.22);
+    --gold:#c9a227;
+    --gold-bright:#e6c34a;
+    --teal:#2fa88c;
+    --text:#eceff3;
+    --text-muted:#8c97a6;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:'Manrope', sans-serif;
+    background:
+      radial-gradient(ellipse 120% 60% at 50% -10%, rgba(201,162,39,0.10), transparent 60%),
+      linear-gradient(180deg, var(--bg-0), var(--bg-1) 60%, #081020);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:28px 16px 90px;
+    overflow-x:hidden;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+  }
+
+  /* Floating musical notes — decorative, drifting behind everything */
+  .floating-notes{
+    position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:-1;
+  }
+  .floating-notes span{
+    position:absolute; bottom:-40px; font-size:18px; color:var(--gold);
+    opacity:0; animation: floatUp linear infinite;
+  }
+  @keyframes floatUp{
+    0%{ transform:translateY(0) rotate(0deg); opacity:0; }
+    10%{ opacity:0.35; }
+    90%{ opacity:0.25; }
+    100%{ transform:translateY(-110vh) rotate(25deg); opacity:0; }
+  }
+
+  /* Greeting card */
+  .greeting-card{
+    display:flex; align-items:center; gap:12px;
+    background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    padding:12px 18px; margin-bottom:18px; max-width:420px; width:100%;
+    position:relative; z-index:1;
+    animation: slideFadeIn .6s ease-out;
+  }
+  .greeting-icon{
+    font-size:26px; animation: gentleBob 3s ease-in-out infinite;
+  }
+  .greeting-msg{ font-family:'Fraunces',serif; font-weight:700; font-size:15px; }
+  .greeting-date{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+  .greeting-time{
+    margin-left:auto; font-family:'Fraunces',serif; font-weight:700; font-size:16px;
+    color:var(--gold-bright); letter-spacing:0.02em; white-space:nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  @keyframes gentleBob{
+    0%, 100%{ transform:translateY(0) rotate(-4deg); }
+    50%{ transform:translateY(-4px) rotate(4deg); }
+  }
+  @keyframes slideFadeIn{
+    from{ opacity:0; transform:translateY(-10px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .greeting-card.morning{ border-color:rgba(240,149,74,0.4); }
+  .greeting-card.afternoon{ border-color:rgba(90,169,230,0.4); }
+  .greeting-card.evening{ border-color:rgba(236,95,160,0.4); }
+  .greeting-card.night{ border-color:rgba(156,123,224,0.4); }
+
+  header{ text-align:center; margin-bottom:22px; position:relative; z-index:1; animation: slideFadeIn .7s ease-out; }
+  .eyebrow{
+    font-size:11px; letter-spacing:0.28em; text-transform:uppercase;
+    color:var(--gold); font-weight:700; margin-bottom:6px;
+  }
+  h1{
+    font-family:'Fraunces', serif; font-weight:900; font-size:clamp(28px,7vw,42px);
+    letter-spacing:-0.01em; line-height:1;
+    background:linear-gradient(180deg, #fff, #d8c98a 140%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .sub{ color:var(--text-muted); font-size:13px; margin-top:6px; }
+
+  /* Tabs */
+  .tabs{
+    display:flex; gap:6px; flex-wrap:wrap; justify-content:center;
+    background:var(--surface); border:1px solid var(--line); border-radius:999px;
+    padding:5px; margin-bottom:26px; max-width:100%;
+  }
+  .tab{
+    border:none; background:transparent; color:var(--text-muted);
+    font-family:'Manrope',sans-serif; font-weight:700; font-size:12.5px;
+    padding:9px 14px; border-radius:999px; cursor:pointer;
+    transition:background .25s, color .25s;
+    white-space:nowrap;
+  }
+  .tab.active{ background:linear-gradient(135deg, var(--gold), #a9821c); color:#0c1220; }
+  .tab:not(.active):hover{ color:var(--text); background:rgba(255,255,255,0.04); }
+  /* Colorful per-genre tabs, like the multi-hued buttons on your library app */
+  .tab[data-cat="english"].active{ background:linear-gradient(135deg, #5AA9E6, #2E7FC7); color:#06141f; }
+  .tab[data-cat="bhojpuri"].active{ background:linear-gradient(135deg, #F0954A, #D9722A); color:#241205; }
+  .tab[data-cat="bollywood"].active{ background:linear-gradient(135deg, #EC5FA0, #C93E7E); color:#22060f; }
+  .tab[data-cat="hindi90"].active{ background:linear-gradient(135deg, #9C7BE0, #7A54C4); color:#150a2c; }
+  .tab[data-cat="favorites"].active{ background:linear-gradient(135deg, #F4C93E, #D9A61E); color:#241b04; }
+
+  /* Player card */
+  .player-card{
+    width:100%; max-width:420px; background:var(--surface);
+    border:1px solid var(--line); border-radius:22px; padding:26px 22px 22px;
+    box-shadow:0 30px 60px -25px rgba(0,0,0,0.7);
+    position:relative;
+    animation: slideFadeIn .8s ease-out;
+    transition: box-shadow .6s;
+  }
+  .player-card.is-playing{
+    animation: slideFadeIn .8s ease-out, glowPulse 3.5s ease-in-out infinite;
+  }
+  @keyframes glowPulse{
+    0%, 100%{ box-shadow:0 30px 60px -25px rgba(0,0,0,0.7), 0 0 0 rgba(201,162,39,0); }
+    50%{ box-shadow:0 30px 60px -25px rgba(0,0,0,0.7), 0 0 30px rgba(201,162,39,0.18); }
+  }
+
+  /* Vinyl */
+  .vinyl-wrap{ display:flex; justify-content:center; margin-bottom:20px; }
+  .vinyl{
+    width:168px; height:168px; border-radius:50%; position:relative;
+    background:
+      repeating-radial-gradient(circle at 50% 50%, #1a2438 0px, #1a2438 2px, #0d1524 3px, #0d1524 4px);
+    box-shadow: inset 0 0 0 1px rgba(201,162,39,0.25), 0 10px 30px rgba(0,0,0,0.5);
+    display:flex; align-items:center; justify-content:center;
+    animation: spin 6s linear infinite; animation-play-state:paused;
+  }
+  .vinyl.spinning{ animation-play-state:running; }
+  .vinyl::after{
+    content:''; position:absolute; width:100%; height:100%; border-radius:50%;
+    background:conic-gradient(from 0deg, rgba(255,255,255,0.06), transparent 30%, transparent 70%, rgba(255,255,255,0.05));
+  }
+  .vinyl-label{
+    width:58px; height:58px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--gold-bright), var(--gold) 55%, #8a6a15 100%);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces',serif; font-weight:900; font-size:18px; color:#171008;
+    z-index:1; box-shadow:0 2px 8px rgba(0,0,0,0.4);
+    transition:background .4s;
+  }
+  .vinyl-label.c-english{ background:radial-gradient(circle at 35% 30%, #82c3f2, #2E7FC7 55%, #16456f 100%); }
+  .vinyl-label.c-bhojpuri{ background:radial-gradient(circle at 35% 30%, #f7b784, #D9722A 55%, #7a3d12 100%); }
+  .vinyl-label.c-bollywood{ background:radial-gradient(circle at 35% 30%, #f5a1c8, #C93E7E 55%, #6e1f45 100%); }
+  .vinyl-label.c-hindi90{ background:radial-gradient(circle at 35% 30%, #c3aef0, #7A54C4 55%, #3f2b6d 100%); }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .now-playing{ text-align:center; margin-bottom:18px; min-height:44px; }
+  #songTitle{ font-family:'Fraunces',serif; font-weight:700; font-size:17px; line-height:1.25; }
+  #songMeta{ color:var(--text-muted); font-size:12px; margin-top:4px; text-transform:uppercase; letter-spacing:0.05em; }
+
+  /* Video container */
+  .video-frame{
+    width:100%; aspect-ratio:16/9; border-radius:14px; overflow:hidden;
+    border:1px solid var(--line); background:#000; margin-bottom:20px;
+  }
+  .video-frame iframe{ width:100%; height:100%; border:0; display:block; }
+
+  /* Controls */
+  .controls{ display:flex; align-items:center; justify-content:center; gap:14px; }
+  .ctrl-btn{
+    border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    background:var(--surface-2, #17233a); color:var(--text);
+    border:1px solid var(--line); border-radius:50%;
+    transition:transform .15s, background .2s, border-color .2s;
+  }
+  .ctrl-btn:hover{ transform:translateY(-2px); }
+  .ctrl-btn:active{ transform:translateY(0); }
+  .btn-shuffle{
+    width:48px; height:48px; font-size:18px;
+    background:linear-gradient(135deg, #F0954A, #D9722A); color:#241205; border:none;
+  }
+  .btn-play{
+    width:64px; height:64px; font-size:22px;
+    background:linear-gradient(135deg, #4FD68C, #23A866);
+    color:#04160c; border:none;
+  }
+  .btn-fav{
+    width:48px; height:48px; font-size:20px;
+    border-color: rgba(236,95,160,0.35);
+  }
+  .btn-fav:hover{ border-color:#EC5FA0; }
+  .btn-fav.active{ color:#EC5FA0; border-color:#EC5FA0; background:rgba(236,95,160,0.12); }
+
+  .status-line{
+    text-align:center; font-size:11.5px; color:var(--text-muted); margin-top:16px;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .dot{ width:6px; height:6px; border-radius:50%; background:var(--teal); }
+  .dot.idle{ background:var(--text-muted); }
+
+  /* Empty state (favorites) */
+  .empty-state{
+    text-align:center; padding:34px 18px; color:var(--text-muted); font-size:13.5px; line-height:1.6;
+  }
+  .empty-state .star{ font-size:30px; display:block; margin-bottom:10px; color:var(--gold); }
+
+  /* Search */
+  .search-row{
+    display:flex; gap:8px; width:100%; max-width:420px; margin-bottom:10px;
+  }
+  .search-row input{
+    flex:1; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; color:var(--text); font-family:'Manrope',sans-serif; font-size:14px;
+  }
+  .search-row input:focus{ outline:none; border-color:var(--gold); }
+  .search-row input::placeholder{ color:var(--text-muted); }
+  .icon-btn{
+    background:linear-gradient(135deg, #3FBFA6, #279684); border:none; color:#04211c;
+    border-radius:12px; width:46px; font-size:17px; cursor:pointer; flex-shrink:0;
+    font-weight:700;
+  }
+  .icon-btn:hover{ filter:brightness(1.08); }
+
+  .search-hint{
+    width:100%; max-width:420px; background:var(--surface); border:1px solid var(--line);
+    border-radius:12px; padding:12px 14px; margin-bottom:16px; font-size:12.5px;
+    color:var(--text-muted); line-height:1.6;
+  }
+  .search-hint b{ color:var(--gold-bright); }
+
+  footer{
+    position:fixed; bottom:12px; right:16px;
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--gold); opacity:0.85; font-weight:700;
+    background:rgba(7,12,20,0.6); padding:6px 12px; border-radius:999px; border:1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+
+<div class="floating-notes" id="floatingNotes"></div>
+
+<div class="greeting-card" id="greetingCard">
+  <div class="greeting-icon" id="greetingIcon">☀️</div>
+  <div class="greeting-text">
+    <div class="greeting-msg" id="greetingMsg">Good Morning</div>
+    <div class="greeting-date" id="greetingDate">Monday, 10 August 2026</div>
+  </div>
+  <div class="greeting-time" id="greetingTime">00:00 AM</div>
+</div>
+
+<header>
+  <div class="eyebrow">Endless Shuffle</div>
+  <h1>Sangeet</h1>
+  <div class="sub">English · Bhojpuri · Bollywood · 90s Hindi</div>
+</header>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-cat="english">English</button>
+  <button class="tab" data-cat="bhojpuri">Bhojpuri</button>
+  <button class="tab" data-cat="bollywood">Bollywood</button>
+  <button class="tab" data-cat="hindi90">90s Hindi</button>
+  <button class="tab" data-cat="favorites">★ Favorites</button>
+</div>
+
+<div class="search-row">
+  <input type="text" id="searchInput" placeholder="Search song, or paste a YouTube link…" />
+  <button class="icon-btn" id="searchBtn" title="Find">🔍</button>
+</div>
+<div class="search-hint" id="searchHint" style="display:none;"></div>
+
+<div class="player-card">
+  <div class="vinyl-wrap">
+    <div class="vinyl" id="vinyl">
+      <div class="vinyl-label" id="vinylLabel">♪</div>
+    </div>
+  </div>
+
+  <div class="now-playing">
+    <div id="songTitle">Tap play to start shuffling</div>
+    <div id="songMeta">&nbsp;</div>
+  </div>
+
+  <div class="video-frame">
+    <div id="ytPlayer"></div>
+  </div>
+
+  <div id="favEmptyState" class="empty-state" style="display:none;">
+    <span class="star">★</span>
+    No favorites yet — while a song is playing, tap the star below to save it here.
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn btn-shuffle" id="shuffleBtn" title="Play another random song">🔀</button>
+    <button class="ctrl-btn btn-play" id="playBtn" title="Play / Pause">▶</button>
+    <button class="ctrl-btn btn-fav" id="favBtn" title="Add to favorites">☆</button>
+  </div>
+
+  <div class="status-line">
+    <span class="dot idle" id="statusDot"></span>
+    <span id="statusText">Ready</span>
+  </div>
+</div>
+
+<footer>Dev by Satyam</footer>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+  // Curated public YouTube playlists — each has many songs, so playback
+  // never runs out, and shuffle picks a genuinely random track every time.
+  const PLAYLISTS = {
+    english:   { name: 'English',   list: 'PLPSCssPYXhWTTcpNZwYoEQWt8Wc8KO0NV' },
+    bhojpuri:  { name: 'Bhojpuri',  list: 'PLNz4YQwT4-GKHmRJq--M9pnuBFlQWhkaw' },
+    bollywood: { name: 'Bollywood', list: 'PLVPrO2TUSZdTwyg4z7Yw17A3Lly_ELWwy' },
+    hindi90:   { name: '90s Hindi', list: 'PLcggtav10zeqaqM2nFaXkjCJe9cFYnZS0' },
+  };
+
+  const FAV_KEY = 'satyam_music_favorites_v1';
+  function getFavorites() { try { return JSON.parse(localStorage.getItem(FAV_KEY)) || []; } catch(e) { return []; } }
+  function saveFavorites(list) { localStorage.setItem(FAV_KEY, JSON.stringify(list)); }
+
+  let player = null;
+  let playerReady = false;
+  let currentCategory = 'english';
+  let lastIndex = -1;
+  let pendingAutoplay = false;
+  let currentVideoId = null;
+  let currentVideoTitle = '';
+  let inSearchMode = false; // true when the currently playing song came from a pasted link
+
+
+  const els = {
+    title: document.getElementById('songTitle'),
+    meta: document.getElementById('songMeta'),
+    playBtn: document.getElementById('playBtn'),
+    shuffleBtn: document.getElementById('shuffleBtn'),
+    favBtn: document.getElementById('favBtn'),
+    vinyl: document.getElementById('vinyl'),
+    statusDot: document.getElementById('statusDot'),
+    statusText: document.getElementById('statusText'),
+    favEmpty: document.getElementById('favEmptyState'),
+    videoFrame: document.querySelector('.video-frame'),
+    searchInput: document.getElementById('searchInput'),
+    searchBtn: document.getElementById('searchBtn'),
+    searchHint: document.getElementById('searchHint'),
+  };
+
+  function setStatus(text, live) {
+    els.statusText.textContent = text;
+    els.statusDot.classList.toggle('idle', !live);
+  }
+
+  function onYouTubeIframeAPIReady() {
+    player = new YT.Player('ytPlayer', {
+      height: '100%', width: '100%',
+      playerVars: { rel: 0, playsinline: 1 },
+      events: {
+        onReady: () => { playerReady = true; if (pendingAutoplay) { pendingAutoplay = false; loadCategory(currentCategory, true); } },
+        onStateChange: onPlayerStateChange,
+        onError: () => { setStatus('Skipped a song that could not play — tap shuffle for another', false); playRandomFromCurrent(); }
+      }
+    });
+  }
+  window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
+  function onPlayerStateChange(e) {
+    const card = document.querySelector('.player-card');
+    if (e.data === YT.PlayerState.PLAYING) {
+      els.playBtn.textContent = '❚❚';
+      els.vinyl.classList.add('spinning');
+      card.classList.add('is-playing');
+      setStatus('Playing', true);
+      const data = player.getVideoData();
+      currentVideoId = data.video_id;
+      currentVideoTitle = data.title || 'Now playing';
+      els.title.textContent = currentVideoTitle;
+      els.meta.textContent = inSearchMode ? 'Search result' : (PLAYLISTS[currentCategory] ? PLAYLISTS[currentCategory].name : 'Favorites');
+      updateFavButton();
+    } else if (e.data === YT.PlayerState.PAUSED) {
+      els.playBtn.textContent = '▶';
+      els.vinyl.classList.remove('spinning');
+      card.classList.remove('is-playing');
+      setStatus('Paused', false);
+    } else if (e.data === YT.PlayerState.ENDED) {
+      // Unlimited random playback — automatically continue with another track.
+      playRandomFromCurrent();
+    } else if (e.data === YT.PlayerState.BUFFERING) {
+      setStatus('Loading…', true);
+    }
+  }
+
+  function loadCategory(cat, autoplay) {
+    inSearchMode = false;
+    hideHint();
+    currentCategory = cat;
+    lastIndex = -1;
+    els.favEmpty.style.display = 'none';
+    els.videoFrame.style.display = 'block';
+
+    if (!playerReady) { pendingAutoplay = true; return; }
+
+    if (cat === 'favorites') {
+      const favs = getFavorites();
+      if (!favs.length) {
+        els.favEmpty.style.display = 'block';
+        els.videoFrame.style.display = 'none';
+        els.title.textContent = 'No favorites yet';
+        els.meta.textContent = '\u00A0';
+        player.stopVideo();
+        els.vinyl.classList.remove('spinning');
+        els.playBtn.textContent = '▶';
+        setStatus('Ready', false);
+        return;
+      }
+      const ids = favs.map(f => f.id);
+      player.cuePlaylist({ playlist: ids, index: 0 });
+      if (autoplay) setTimeout(() => playRandomFromCurrent(), 350);
+      return;
+    }
+
+    const pl = PLAYLISTS[cat];
+    player.cuePlaylist({ listType: 'playlist', list: pl.list });
+    if (autoplay) setTimeout(() => playRandomFromCurrent(), 500);
+  }
+
+  function playRandomFromCurrent() {
+    if (!playerReady) return;
+    // A pasted link is a single song, not a list — shuffle just falls back
+    // to the currently selected tab's playlist instead.
+    if (inSearchMode) inSearchMode = false;
+    if (!player.getPlaylist) return;
+    const list = player.getPlaylist();
+    if (!list || !list.length) {
+      // Playlist metadata not ready yet — try again shortly.
+      setTimeout(playRandomFromCurrent, 500);
+      return;
+    }
+    let idx = Math.floor(Math.random() * list.length);
+    if (list.length > 1 && idx === lastIndex) idx = (idx + 1) % list.length;
+    lastIndex = idx;
+    player.playVideoAt(idx);
+  }
+
+  // ---------- Search (no API key — uses YouTube's own search page) ----------
+  // Accepts a full YouTube link, a youtu.be short link, or a bare 11-char
+  // video ID, and pulls the video ID out of it directly, no API involved.
+  function extractVideoId(input) {
+    const s = input.trim();
+    if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s; // bare video ID
+    try {
+      const url = new URL(s);
+      if (url.hostname.includes('youtu.be')) {
+        return url.pathname.slice(1, 12) || null;
+      }
+      if (url.hostname.includes('youtube.com')) {
+        if (url.searchParams.get('v')) return url.searchParams.get('v');
+        const m = url.pathname.match(/\/(embed|shorts)\/([a-zA-Z0-9_-]{11})/);
+        if (m) return m[2];
+      }
+    } catch (e) { /* not a URL */ }
+    return null;
+  }
+
+  function showHint(html) {
+    els.searchHint.style.display = 'block';
+    els.searchHint.innerHTML = html;
+  }
+  function hideHint() { els.searchHint.style.display = 'none'; }
+
+  function runSearch() {
+    const raw = els.searchInput.value.trim();
+    if (!raw) return;
+
+    const videoId = extractVideoId(raw);
+    if (videoId) {
+      playPastedVideo(videoId);
+      return;
+    }
+
+    // Plain text — open YouTube's real search in a new tab, since that's
+    // more complete and reliable than anything we could build without a key.
+    const url = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(raw);
+    window.open(url, '_blank');
+    showHint('Opened YouTube search in a new tab. Tap the song you want, copy its link from the address bar, then paste it back in this box and hit 🔍 again to play it here.');
+  }
+
+  function playPastedVideo(videoId) {
+    if (!playerReady) return;
+    inSearchMode = true;
+    currentCategory = null;
+    els.favEmpty.style.display = 'none';
+    els.videoFrame.style.display = 'block';
+    hideHint();
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    player.loadVideoById(videoId);
+    els.searchInput.value = '';
+  }
+
+  els.searchBtn.addEventListener('click', runSearch);
+  els.searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+
+
+  function updateFavButton() {
+    const favs = getFavorites();
+    const isFav = currentVideoId && favs.some(f => f.id === currentVideoId);
+    els.favBtn.textContent = isFav ? '★' : '☆';
+    els.favBtn.classList.toggle('active', isFav);
+  }
+
+  function toggleFavorite() {
+    if (!currentVideoId) return;
+    let favs = getFavorites();
+    const idx = favs.findIndex(f => f.id === currentVideoId);
+    if (idx >= 0) {
+      favs.splice(idx, 1);
+    } else {
+      favs.unshift({ id: currentVideoId, title: currentVideoTitle });
+      favs = favs.slice(0, 200); // keep it sane
+    }
+    saveFavorites(favs);
+    updateFavButton();
+  }
+
+  // Tabs
+  document.getElementById('tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab');
+    if (!btn) return;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    const vinylLabel = document.getElementById('vinylLabel');
+    vinylLabel.className = 'vinyl-label c-' + btn.dataset.cat;
+    loadCategory(btn.dataset.cat, true);
+  });
+
+  // Play/pause button — also acts as the first "start" tap.
+  els.playBtn.addEventListener('click', () => {
+    if (!playerReady) { pendingAutoplay = true; return; }
+    const state = player.getPlayerState ? player.getPlayerState() : -1;
+    if (currentVideoId === null) {
+      loadCategory(currentCategory, true);
+    } else if (state === YT.PlayerState.PLAYING) {
+      player.pauseVideo();
+    } else {
+      player.playVideo();
+    }
+  });
+
+  els.shuffleBtn.addEventListener('click', () => {
+    if (!playerReady) return;
+    playRandomFromCurrent();
+  });
+
+  els.favBtn.addEventListener('click', toggleFavorite);
+
+  // ---------- Greeting (time-of-day message + date) ----------
+  function renderGreeting() {
+    const now = new Date();
+    const hour = now.getHours();
+    let msg, icon, mood;
+    if (hour >= 5 && hour < 12) { msg = 'Good Morning'; icon = '☀️'; mood = 'morning'; }
+    else if (hour >= 12 && hour < 17) { msg = 'Good Afternoon'; icon = '🌤️'; mood = 'afternoon'; }
+    else if (hour >= 17 && hour < 21) { msg = 'Good Evening'; icon = '🌇'; mood = 'evening'; }
+    else { msg = 'Good Night'; icon = '🌙'; mood = 'night'; }
+
+    const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    document.getElementById('greetingMsg').textContent = msg + ' — time for some music';
+    document.getElementById('greetingDate').textContent = dateStr;
+    document.getElementById('greetingIcon').textContent = icon;
+    const card = document.getElementById('greetingCard');
+    card.classList.remove('morning', 'afternoon', 'evening', 'night');
+    card.classList.add(mood);
+  }
+  function renderClock() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+    document.getElementById('greetingTime').textContent = timeStr;
+  }
+  renderGreeting();
+  renderClock();
+  setInterval(renderGreeting, 60000); // keep the message/date fresh across hour/day changes
+  setInterval(renderClock, 1000);     // tick the clock every second
+
+  // ---------- Floating musical notes (decorative background animation) ----------
+  function spawnFloatingNotes() {
+    const container = document.getElementById('floatingNotes');
+    const glyphs = ['♪', '♫', '♬', '♩'];
+    const count = 10;
+    for (let i = 0; i < count; i++) {
+      const span = document.createElement('span');
+      span.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+      span.style.left = Math.random() * 100 + 'vw';
+      span.style.fontSize = (14 + Math.random() * 16) + 'px';
+      span.style.animationDuration = (14 + Math.random() * 12) + 's';
+      span.style.animationDelay = (Math.random() * 16) + 's';
+      container.appendChild(span);
+    }
+  }
+  spawnFloatingNotes();
+</script>
+</body>
+</html>
