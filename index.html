@@ -426,6 +426,7 @@
   <div class="video-frame">
     <div id="ytPlayer"></div>
   </div>
+  <div id="ytBrowsePlayer" style="position:absolute; width:1px; height:1px; overflow:hidden; opacity:0; pointer-events:none;"></div>
   <audio id="jamendoAudio" preload="none"></audio>
   <div class="audio-wave" id="audioWave">
     <span></span><span></span><span></span><span></span><span></span>
@@ -489,17 +490,53 @@
 
   let player = null;
   let playerReady = false;
-  let currentCategory = 'english';
+  let browsePlayer = null;      // hidden second player — fetches playlist contents for browsing WITHOUT touching active playback
+  let browsePlayerReady = false;
+  let currentCategory = 'english'; // which tab is currently being *browsed* (may differ from what's actually playing)
+  let activePlaylistKey = null;    // which category's playlist is actually loaded in the main player right now
   let lastIndex = -1;
   let pendingAutoplay = false;
   let currentVideoId = null;
   let currentVideoTitle = '';
   let inSearchMode = false; // true when the currently playing song came from a pasted link
-  let playlistVerifiedReady = false; // true once the current tab's playlist is confirmed correctly loaded
-  let mediaMode = 'youtube'; // 'youtube' or 'jamendo' — which player is actually driving playback right now
+  let browsePlaylistReady = false; // true once the currently BROWSED tab's list has finished loading
+  let mediaMode = null; // 'youtube' or 'jamendo' — which player is actually driving playback right now (null = nothing playing yet)
   let jamendoTracks = []; // [{id, name, artist_name, audio, image}] for the current Ad-Free list
   let jamendoIndex = -1;
-  const JAMENDO_CLIENT_ID = '709fa152'; // Jamendo's own published shared testing client_id — no signup needed
+  let currentBrowseIds = []; // video IDs for whatever tab is currently being browsed (named playlist or favorites)
+  // Static, permanently-hosted tracks from Wikimedia Commons (the same CDN
+  // that serves all of Wikipedia's media) — no API key, no signup, no rate
+  // limits, and no dependency on any third-party service that could go down.
+  const PLACEHOLDER_THUMB = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="56" height="32"><rect width="56" height="32" fill="%2317233a"/><text x="28" y="21" font-size="14" text-anchor="middle" fill="%23c9a227">♪</text></svg>'
+  );
+  const AD_FREE_TRACKS = [
+    { name: 'The Temperature of the Air on the Bow of the Kaleetan', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 01 - The Temperature of the Air on the Bow of the Kaleetan.ogg' },
+    { name: 'Cylinder Two', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 02 - Cylinder Two.ogg' },
+    { name: 'John Stockton Slow Drag', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 02 - John Stockton Slow Drag.ogg' },
+    { name: 'Cylinder Three', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 03 - Cylinder Three.ogg' },
+    { name: "There's Probably No Time", artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 03 - Theres Probably No Time.ogg' },
+    { name: 'Cylinder Four', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 04 - Cylinder Four.ogg' },
+    { name: 'Cylinder Five', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 05 - Cylinder Five.ogg' },
+    { name: 'The 49th Street Galleria', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 05 - The 49th Street Galleria.ogg' },
+    { name: 'Cylinder Six', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 06 - Cylinder Six.ogg' },
+    { name: 'That Kid in Fourth Grade Who Really Liked the Denver Broncos', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 06 - That Kid in Fourth Grade Who Really Liked the Denver Broncos.ogg' },
+    { name: 'Cylinder Seven', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 07 - Cylinder Seven.ogg' },
+    { name: 'Undercover Vampire Policeman', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 07 - Undercover Vampire Policeman.ogg' },
+    { name: 'Cylinder Eight', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 08 - Cylinder Eight.ogg' },
+    { name: 'Cylinder Nine', artist: 'Chris Zabriskie', file: 'Chris Zabriskie - 09 - Cylinder Nine.ogg' },
+    { name: 'El Noi de la Mare (guitar)', artist: 'Traditional', file: 'El Noi de la Mare (guitar).ogg' },
+    { name: "Sonatine, M. 40 - III. Animé (2 guitars)", artist: 'Ravel — Tomasi-Musso Guitar Duo', file: "Ravel's Sonatine, M. 40 - III. Animé (2 guitars) - Tomasi-Musso Guitar Duo.ogg" },
+    { name: 'Piano Sonata No. 8 in A minor', artist: 'Mozart — Randolph Hokanson', file: 'Mozart Piano Sonata Amin1.ogg' },
+    { name: 'Piano Sonata No. 1 - I. Allegro', artist: 'Beethoven — Artur Schnabel', file: 'Piano Sonata N° 1 - 1. Allegro (Beethoven, Schnabel).ogg' },
+    { name: 'Piano Concerto No. 2 in F minor - I.', artist: 'Chopin — Seattle Philharmonic', file: 'Frederick Chopin - Concerto 2 in F minor, 1st movement.ogg' },
+    { name: 'Piano Concerto in A minor, Op. 16 - I.', artist: 'Edvard Grieg', file: 'Edvard Grieg - piano concerto in a minor, op. 16 - i. allegro molto moderato.ogg' },
+    { name: "Passacaglia and Fugue in C minor, BWV 582", artist: 'Bach — Awadagin Pratt', file: '20091104 Awadagin Pratt - Bach\'s Passacaglia and Fugue in C minor, BWV 582.ogg' }
+  ];
+  function wikimediaFileUrl(filename) {
+    return 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(filename);
+  }
+
   const jamendoAudio = document.getElementById('jamendoAudio');
   let seekTimer = null;
   let isDraggingSeek = false;
@@ -557,9 +594,19 @@
       height: '100%', width: '100%',
       playerVars: { rel: 0, playsinline: 1 },
       events: {
-        onReady: () => { playerReady = true; if (pendingAutoplay) { pendingAutoplay = false; loadCategory(currentCategory); } },
+        onReady: () => { playerReady = true; },
         onStateChange: onPlayerStateChange,
-        onError: () => { setStatus('Skipped a song that could not play — tap shuffle for another', false); playRandomFromCurrent(); }
+        onError: () => { setStatus('Skipped a song that could not play — tap shuffle for another', false); playRandomFromActive(); }
+      }
+    });
+    // Hidden second player: only ever used to look up a playlist's contents
+    // for the song list — it never plays audio, so switching tabs never
+    // interrupts whatever is actually playing in the main player above.
+    browsePlayer = new YT.Player('ytBrowsePlayer', {
+      height: '100%', width: '100%',
+      playerVars: { rel: 0, playsinline: 1, mute: 1 },
+      events: {
+        onReady: () => { browsePlayerReady = true; loadCategory(currentCategory); }
       }
     });
   }
@@ -577,9 +624,9 @@
       currentVideoId = data.video_id;
       currentVideoTitle = data.title || 'Now playing';
       els.title.textContent = currentVideoTitle;
-      els.meta.textContent = inSearchMode ? 'Search result' : (PLAYLISTS[currentCategory] ? PLAYLISTS[currentCategory].name : 'Favorites');
+      els.meta.textContent = inSearchMode ? 'Search result' : (PLAYLISTS[activePlaylistKey] ? PLAYLISTS[activePlaylistKey].name : 'Favorites');
       updateFavButton();
-      hideSongList();
+      if (currentCategory === activePlaylistKey) hideSongList(); // only close the list if you were browsing the thing that just started
       els.seekRow.style.display = 'flex';
       startSeekTicker();
     } else if (e.data === YT.PlayerState.PAUSED) {
@@ -590,10 +637,22 @@
       setStatus('Paused', false);
     } else if (e.data === YT.PlayerState.ENDED) {
       // Unlimited random playback — automatically continue with another track.
-      playRandomFromCurrent();
+      playRandomFromActive();
     } else if (e.data === YT.PlayerState.BUFFERING) {
       setStatus('Loading…', true);
     }
+  }
+
+  // Picks another random song from whatever playlist is actually ACTIVE right
+  // now — independent of whichever tab you might currently be browsing.
+  function playRandomFromActive() {
+    if (!playerReady || mediaMode !== 'youtube' || !activePlaylistKey || !player.getPlaylist) return;
+    const list = player.getPlaylist();
+    if (!list || !list.length) return;
+    let idx = Math.floor(Math.random() * list.length);
+    if (list.length > 1 && idx === lastIndex) idx = (idx + 1) % list.length;
+    lastIndex = idx;
+    player.playVideoAt(idx);
   }
 
   function startSeekTicker() {
@@ -631,29 +690,27 @@
   });
 
   els.prevBtn.addEventListener('click', () => {
-    hideSongList();
     if (mediaMode === 'jamendo') {
       if (jamendoTracks.length) playJamendoTrack((jamendoIndex - 1 + jamendoTracks.length) % jamendoTracks.length);
     } else {
-      if (!playerReady || !player.previousVideo) return;
+      if (!playerReady || !player.previousVideo || mediaMode !== 'youtube') return;
       player.previousVideo();
     }
   });
   els.nextBtn.addEventListener('click', () => {
-    hideSongList();
     if (mediaMode === 'jamendo') {
       if (jamendoTracks.length) playJamendoTrack((jamendoIndex + 1) % jamendoTracks.length);
     } else {
-      if (!playerReady || !player.nextVideo) return;
+      if (!playerReady || !player.nextVideo || mediaMode !== 'youtube') return;
       player.nextVideo();
     }
   });
   els.listBtn.addEventListener('click', () => {
-    if (mediaMode === 'jamendo') {
+    if (currentCategory === 'jamendo') {
       loadJamendoTracks(loadRequestId);
       return;
     }
-    if (playlistVerifiedReady) {
+    if (browsePlaylistReady) {
       showSongListForCurrentPlaylist();
     }
   });
@@ -661,120 +718,142 @@
   let loadRequestId = 0; // guards against a late callback from a previous tab switch overriding a newer one
   let currentFavForList = null; // favorites metadata snapshot, used to label the list without extra lookups
 
+  // Switching tabs only changes what you're BROWSING — it never touches
+  // whatever is actively playing. Playback only changes when you explicitly
+  // tap a song, tap Shuffle, or tap Play with nothing chosen yet.
   function loadCategory(cat) {
     inSearchMode = false;
     hideHint();
     hideSongList();
     currentCategory = cat;
-    lastIndex = -1;
-    playlistVerifiedReady = false;
+    browsePlaylistReady = false;
     els.favEmpty.style.display = 'none';
-    els.videoFrame.style.display = 'block';
-    els.seekRow.style.display = 'none';
     const myRequestId = ++loadRequestId;
 
-    jamendoAudio.pause();
-    if (playerReady) player.stopVideo();
-    els.vinyl.classList.remove('spinning');
-    els.playBtn.textContent = '▶';
-    document.getElementById('audioWave').classList.remove('playing');
-    document.querySelector('.player-card').classList.remove('is-playing');
-    currentVideoId = null;
-
     if (cat === 'jamendo') {
-      mediaMode = 'jamendo';
-      els.videoFrame.style.display = 'none';
       loadJamendoTracks(myRequestId);
       return;
     }
-    mediaMode = 'youtube';
-
-    if (!playerReady) { pendingAutoplay = true; return; }
 
     if (cat === 'favorites') {
       const favs = getFavorites();
       currentFavForList = favs;
       if (!favs.length) {
         els.favEmpty.style.display = 'block';
-        els.videoFrame.style.display = 'none';
-        els.title.textContent = 'No favorites yet';
-        els.meta.textContent = '\u00A0';
-        setStatus('Ready', false);
+        els.songList.style.display = 'none';
         return;
       }
-      const ids = favs.map(f => f.id);
-      player.cuePlaylist({ playlist: ids, index: 0 });
-      setStatus('Loading…', true);
-      els.title.textContent = 'Loading your favorites…';
-      waitForPlaylistThenList(myRequestId, ids.length, null, true);
+      currentBrowseIds = favs.map(f => f.id);
+      browsePlaylistReady = true;
+      showSongListForCurrentPlaylist();
       return;
     }
 
     currentFavForList = null;
+    if (!browsePlayerReady) return; // browsePlayer's own onReady will call loadCategory(currentCategory) once it's up
+
     const pl = PLAYLISTS[cat];
-    player.cuePlaylist({ listType: 'playlist', list: pl.list });
-    setStatus('Loading…', true);
-    els.title.textContent = 'Loading ' + pl.name + ' songs…';
-    waitForPlaylistThenList(myRequestId, null, pl.list, false);
+    browsePlayer.cuePlaylist({ listType: 'playlist', list: pl.list });
+    els.songList.style.display = 'block';
+    els.songListStatus.style.display = 'block';
+    els.songListStatus.textContent = 'Loading ' + pl.name + ' songs…';
+    els.songList.innerHTML = '';
+    waitForBrowsePlaylistThenList(myRequestId, pl.list, 0);
+  }
+
+  // Polls the hidden browse player until it's actually finished loading the
+  // intended playlist (verified via getPlaylistId) — this is what prevents
+  // a previous tab's songs from showing under a new tab's name, without
+  // ever touching the main player that's actually playing something.
+  function waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt) {
+    if (requestId !== loadRequestId) return; // a newer tab switch has already superseded this one
+    if (!browsePlayerReady || !browsePlayer.getPlaylist) return;
+
+    const list = browsePlayer.getPlaylist();
+    const idMatches = browsePlayer.getPlaylistId && browsePlayer.getPlaylistId() === expectedPlaylistId;
+
+    if (list && list.length && idMatches) {
+      currentBrowseIds = list;
+      browsePlaylistReady = true;
+      showSongListForCurrentPlaylist();
+      return;
+    }
+    if (attempt === 15) {
+      els.songListStatus.textContent = 'Still loading… (slow connection)';
+    }
+    if (attempt >= 150) {
+      els.songListStatus.textContent = 'Could not load this playlist — check your internet connection';
+      return;
+    }
+    setTimeout(() => waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt + 1), 400);
+  }
+
+  // The one place that actually starts/switches what's playing. Called when
+  // you tap a specific song, tap Shuffle, or tap Play with nothing chosen yet.
+  function activatePlaylist(cat, index) {
+    if (!playerReady) return;
+    if (mediaMode === 'jamendo') jamendoAudio.pause();
+    els.videoFrame.style.display = 'block';
+
+    if (activePlaylistKey === cat && mediaMode === 'youtube') {
+      // Same playlist already loaded in the main player — just jump songs, no reload flicker.
+      player.playVideoAt(index);
+    } else if (cat === 'favorites') {
+      player.loadPlaylist({ playlist: currentBrowseIds, index });
+    } else {
+      player.loadPlaylist({ listType: 'playlist', list: PLAYLISTS[cat].list, index });
+    }
+    mediaMode = 'youtube';
+    activePlaylistKey = cat;
+    lastIndex = index;
+    document.getElementById('vinylLabel').className = 'vinyl-label c-' + cat;
+    hideSongList();
   }
 
   // ---------- Ad-Free (Jamendo — independent, Creative Commons, no ads) ----------
   function loadJamendoTracks(requestId) {
-    setStatus('Loading…', true);
-    els.title.textContent = 'Loading ad-free songs…';
-    els.meta.textContent = '';
     els.songList.style.display = 'block';
-    els.songListStatus.style.display = 'block';
-    els.songListStatus.textContent = 'Loading songs…';
     els.songList.innerHTML = '';
+    els.songListStatus.style.display = 'none';
 
-    const randomOffset = Math.floor(Math.random() * 400); // rotates through Jamendo's catalog instead of always the same fixed top tracks
-    const url = 'https://api.jamendo.com/v3.0/tracks/?client_id=' + JAMENDO_CLIENT_ID +
-      '&format=json&limit=20&offset=' + randomOffset + '&order=popularity_total&audioformat=mp31&include=musicinfo';
-    fetch(url).then(r => r.json()).then(data => {
-      if (requestId !== loadRequestId) return;
-      jamendoTracks = (data.results || []).filter(t => t.audio);
-      if (!jamendoTracks.length) {
-        els.songListStatus.textContent = 'Could not load songs right now — try again shortly.';
-        setStatus('Ready', false);
-        return;
-      }
-      playlistVerifiedReady = true;
-      setStatus('Ready', false);
-      els.title.textContent = 'Tap a song to play';
-      els.meta.textContent = 'Ad-Free (Jamendo)';
-      els.songListStatus.style.display = 'none';
-      jamendoTracks.forEach((t, i) => {
-        const row = document.createElement('div');
-        row.className = 'song-row';
-        row.innerHTML =
-          '<span class="song-row-num">' + (i + 1) + '</span>' +
-          '<img src="' + (t.image || '') + '" alt="">' +
-          '<div class="song-row-text">' +
-            '<div class="song-row-title">' + escapeHtml(t.name) + '</div>' +
-            '<div class="song-row-channel">' + escapeHtml(t.artist_name || '') + '</div>' +
-          '</div>';
-        row.addEventListener('click', () => playJamendoTrack(i));
-        els.songList.appendChild(row);
-      });
-    }).catch(() => {
-      if (requestId !== loadRequestId) return;
-      els.songListStatus.textContent = 'Could not reach the ad-free catalog — check your internet connection.';
-      setStatus('Ready', false);
+    jamendoTracks = AD_FREE_TRACKS.map(t => ({
+      name: t.name,
+      artist_name: t.artist,
+      audio: wikimediaFileUrl(t.file),
+      image: PLACEHOLDER_THUMB
+    }));
+
+    browsePlaylistReady = true;
+
+    jamendoTracks.forEach((t, i) => {
+      const row = document.createElement('div');
+      row.className = 'song-row';
+      row.innerHTML =
+        '<span class="song-row-num">' + (i + 1) + '</span>' +
+        '<img src="' + t.image + '" alt="">' +
+        '<div class="song-row-text">' +
+          '<div class="song-row-title">' + escapeHtml(t.name) + '</div>' +
+          '<div class="song-row-channel">' + escapeHtml(t.artist_name || '') + '</div>' +
+        '</div>';
+      row.addEventListener('click', () => playJamendoTrack(i));
+      els.songList.appendChild(row);
     });
   }
 
   function playJamendoTrack(idx) {
     if (idx < 0 || idx >= jamendoTracks.length) return;
+    if (mediaMode === 'youtube' && playerReady) player.pauseVideo();
     mediaMode = 'jamendo';
     jamendoIndex = idx;
     const t = jamendoTracks[idx];
     hideSongList();
+    els.videoFrame.style.display = 'none';
+    document.getElementById('vinylLabel').className = 'vinyl-label c-jamendo';
     jamendoAudio.src = t.audio;
     jamendoAudio.play();
     els.title.textContent = t.name;
-    els.meta.textContent = t.artist_name || 'Ad-Free (Jamendo)';
-    els.favBtn.classList.remove('active'); // favoriting Jamendo tracks isn't supported yet
+    els.meta.textContent = t.artist_name || 'Ad-Free (Wikimedia Commons)';
+    els.favBtn.classList.remove('active'); // favoriting Ad-Free tracks isn't supported yet
     els.favBtn.textContent = '☆';
   }
 
@@ -809,52 +888,9 @@
   });
 
 
-  // playlist (checked via getPlaylistId for named playlists, or the
-  // expected item count for a custom favorites list) — this is what
-  // prevents a previous tab's songs from showing under a new tab's name.
-  // On a slow connection this can take a while, so it keeps waiting rather
-  // than ever guessing with whatever (possibly wrong) playlist is loaded so far.
-  function waitForPlaylistThenList(requestId, expectedCount, expectedPlaylistId, isFavorites, attempt) {
-    attempt = attempt || 0;
-    if (requestId !== loadRequestId) return; // a newer tab switch has already superseded this one
-    if (!playerReady || !player.getPlaylist) return;
-
-    const list = player.getPlaylist();
-    const idMatches = !expectedPlaylistId || (player.getPlaylistId && player.getPlaylistId() === expectedPlaylistId);
-    const countMatches = expectedCount === null || (list && list.length === expectedCount);
-
-    if (list && list.length && idMatches && countMatches) {
-      playlistVerifiedReady = true;
-      setStatus('Ready', false);
-      showSongListForCurrentPlaylist();
-      return;
-    }
-    if (attempt === 15) {
-      setStatus('Still loading… (slow connection)', false);
-    }
-    if (attempt >= 150) {
-      setStatus('Could not load this playlist — check your internet connection', false);
-      els.title.textContent = 'Could not load songs';
-      return;
-    }
-    setTimeout(() => waitForPlaylistThenList(requestId, expectedCount, expectedPlaylistId, isFavorites, attempt + 1), 400);
-  }
-
-  function playRandomFromCurrent() {
-    if (!playerReady || !playlistVerifiedReady) return;
-    if (inSearchMode) inSearchMode = false;
-    if (!player.getPlaylist) return;
-    const list = player.getPlaylist();
-    if (!list || !list.length) return;
-    let idx = Math.floor(Math.random() * list.length);
-    if (list.length > 1 && idx === lastIndex) idx = (idx + 1) % list.length;
-    lastIndex = idx;
-    hideSongList();
-    player.playVideoAt(idx);
-  }
 
   // ---------- Song list (tap a specific song instead of guessing) ----------
-  let shownIndices = new Set(); // which playlist indices have already been loaded into the visible list
+  let shownIndices = new Set(); // which browse-list indices have already been shown
   const BATCH_SIZE = 30;
 
   function hideSongList() {
@@ -875,24 +911,17 @@
   }
 
   function showSongListForCurrentPlaylist() {
-    if (!playerReady || !player.getPlaylist) return;
-    const list = player.getPlaylist();
-    if (!list || !list.length) return;
-
+    if (!currentBrowseIds.length) return;
     shownIndices = new Set();
     els.songList.style.display = 'block';
     els.songListTools.style.display = 'block';
     els.songFilterInput.value = '';
     els.songList.innerHTML = '';
-    els.title.textContent = 'Tap a song to play';
-    els.meta.textContent = inSearchMode ? '' : (currentCategory === 'favorites' ? 'Favorites' : (PLAYLISTS[currentCategory] ? PLAYLISTS[currentCategory].name : ''));
-
     loadMoreSongRows();
   }
 
   function loadMoreSongRows() {
-    if (!playerReady || !player.getPlaylist) return;
-    const list = player.getPlaylist();
+    const list = currentBrowseIds;
     if (!list || !list.length) return;
 
     const available = [];
@@ -914,6 +943,7 @@
     els.loadMoreBtn.style.display = 'none';
 
     const requestSnapshot = loadRequestId;
+    const browseCat = currentCategory;
     const idsToShow = indices.map(i => list[i]);
     const lookups = idsToShow.map((id, pos) => {
       const realIndex = indices[pos];
@@ -938,11 +968,7 @@
             '<div class="song-row-title">' + escapeHtml(info.title) + '</div>' +
             '<div class="song-row-channel">' + escapeHtml(info.channel || '') + '</div>' +
           '</div>';
-        row.addEventListener('click', () => {
-          lastIndex = realIndex;
-          hideSongList();
-          player.playVideoAt(realIndex);
-        });
+        row.addEventListener('click', () => activatePlaylist(browseCat, realIndex));
         els.songList.appendChild(row);
       });
 
@@ -1010,14 +1036,16 @@
 
   function playPastedVideo(videoId) {
     if (!playerReady) return;
+    if (mediaMode === 'jamendo') jamendoAudio.pause();
     inSearchMode = true;
     currentCategory = null;
-    playlistVerifiedReady = false;
+    activePlaylistKey = null;
     els.favEmpty.style.display = 'none';
     els.videoFrame.style.display = 'block';
     hideHint();
     hideSongList();
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    mediaMode = 'youtube';
     player.loadVideoById(videoId);
     els.searchInput.value = '';
   }
@@ -1047,18 +1075,18 @@
     updateFavButton();
   }
 
-  // Tabs
+  // Tabs — switching tabs only changes what you're browsing, never interrupts playback
   document.getElementById('tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('.tab');
     if (!btn) return;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    const vinylLabel = document.getElementById('vinylLabel');
-    vinylLabel.className = 'vinyl-label c-' + btn.dataset.cat;
     loadCategory(btn.dataset.cat);
   });
 
-  // Play/pause button — also acts as the first "start" tap.
+  // Play/pause button — toggles whatever is ACTIVELY playing, regardless of
+  // which tab you're browsing. If nothing has played yet, starts a random
+  // song from whatever tab you're currently looking at.
   els.playBtn.addEventListener('click', () => {
     if (mediaMode === 'jamendo') {
       if (jamendoAudio.src) {
@@ -1068,22 +1096,27 @@
       }
       return;
     }
-    if (!playerReady) { pendingAutoplay = true; return; }
-    const state = player.getPlayerState ? player.getPlayerState() : -1;
-    if (currentVideoId === null) {
-      if (playlistVerifiedReady) { playRandomFromCurrent(); }
-      else { loadCategory(currentCategory); }
-    } else if (state === YT.PlayerState.PLAYING) {
-      player.pauseVideo();
+    if (mediaMode === 'youtube' && currentVideoId !== null) {
+      if (!playerReady) return;
+      const state = player.getPlayerState ? player.getPlayerState() : -1;
+      if (state === YT.PlayerState.PLAYING) player.pauseVideo(); else player.playVideo();
+      return;
+    }
+    if (currentCategory === 'jamendo') { playRandomJamendo(); return; }
+    if (browsePlaylistReady && currentBrowseIds.length) {
+      activatePlaylist(currentCategory, Math.floor(Math.random() * currentBrowseIds.length));
     } else {
-      player.playVideo();
+      loadCategory(currentCategory);
     }
   });
 
+  // Shuffle — plays a random song from whichever tab you're currently
+  // browsing (an explicit tap, so it's fine for this to switch playback).
   els.shuffleBtn.addEventListener('click', () => {
-    if (mediaMode === 'jamendo') { playRandomJamendo(); return; }
-    if (!playerReady) return;
-    playRandomFromCurrent();
+    if (currentCategory === 'jamendo') { playRandomJamendo(); return; }
+    if (browsePlaylistReady && currentBrowseIds.length) {
+      activatePlaylist(currentCategory, Math.floor(Math.random() * currentBrowseIds.length));
+    }
   });
 
   els.favBtn.addEventListener('click', toggleFavorite);
