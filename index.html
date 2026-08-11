@@ -39,6 +39,42 @@
   }
 
   /* Floating musical notes — decorative, drifting behind everything */
+  /* Name entry modal (first visit only) */
+  .name-modal-overlay{
+    position:fixed; inset:0; background:rgba(4,7,12,0.85); display:none;
+    align-items:center; justify-content:center; padding:20px; z-index:100;
+  }
+  .name-modal-overlay.open{ display:flex; }
+  .name-modal{
+    width:100%; max-width:360px; background:var(--surface); border:1px solid var(--line);
+    border-radius:20px; padding:30px 26px; text-align:center;
+    animation: slideFadeIn .5s ease-out;
+  }
+  .name-modal-icon{ font-size:36px; margin-bottom:10px; animation: gentleBob 3s ease-in-out infinite; }
+  .name-modal h3{ font-family:'Fraunces',serif; font-weight:700; font-size:20px; margin-bottom:6px; }
+  .name-modal p{ color:var(--text-muted); font-size:13px; margin-bottom:16px; }
+  .name-modal input{
+    width:100%; background:var(--bg-0); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; color:var(--text); font-size:14px; margin-bottom:14px; text-align:center;
+    font-family:'Manrope',sans-serif;
+  }
+  .name-modal input:focus{ outline:none; border-color:var(--gold); }
+  .name-modal button{
+    width:100%; padding:12px; border-radius:10px; border:none; cursor:pointer;
+    font-weight:700; font-size:14px; font-family:'Manrope',sans-serif;
+    background:linear-gradient(135deg, var(--gold-bright), var(--gold)); color:#171008;
+  }
+
+  /* Welcome toast (random wish, every visit) */
+  .welcome-toast{
+    position:fixed; top:16px; left:50%; transform:translateX(-50%) translateY(-30px);
+    max-width:min(92vw, 420px); background:var(--surface); border:1px solid var(--line);
+    border-radius:14px; padding:14px 20px; text-align:center; font-size:13.5px; font-weight:600;
+    box-shadow:0 20px 40px -15px rgba(0,0,0,0.6); opacity:0; z-index:90;
+    transition: opacity .5s, transform .5s; pointer-events:none;
+  }
+  .welcome-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
   .floating-notes{
     position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:-1;
   }
@@ -258,6 +294,13 @@
   }
 
   /* Song list */
+  .song-list-tools{ width:100%; margin-bottom:8px; }
+  .song-list-tools input{
+    width:100%; background:var(--bg-0); border:1px solid var(--line); border-radius:10px;
+    padding:9px 12px; color:var(--text); font-size:12.5px; font-family:'Manrope',sans-serif;
+  }
+  .song-list-tools input:focus{ outline:none; border-color:var(--gold); }
+
   .song-list{
     width:100%; max-height:320px; overflow-y:auto; margin-bottom:16px;
     border:1px solid var(--line); border-radius:14px; background:var(--bg-0);
@@ -325,6 +368,18 @@
 
 <div class="floating-notes" id="floatingNotes"></div>
 
+<div class="name-modal-overlay" id="nameModalOverlay">
+  <div class="name-modal">
+    <div class="name-modal-icon">🎵</div>
+    <h3>Welcome to Sangeet</h3>
+    <p>What should we call you?</p>
+    <input type="text" id="nameInput" placeholder="Your name" maxlength="30" />
+    <button id="nameSubmitBtn">Let's go</button>
+  </div>
+</div>
+
+<div class="welcome-toast" id="welcomeToast"></div>
+
 <div class="greeting-card" id="greetingCard">
   <div class="greeting-icon" id="greetingIcon">☀️</div>
   <div class="greeting-text">
@@ -341,13 +396,13 @@
 </header>
 
 <div class="tabs" id="tabs">
+  <button class="tab" data-cat="jamendo">🎧 Ad-Free</button>
   <button class="tab active" data-cat="english">English</button>
   <button class="tab" data-cat="bhojpuri">Bhojpuri</button>
   <button class="tab" data-cat="bollywood">Bollywood</button>
   <button class="tab" data-cat="bollynew">New Bollywood</button>
   <button class="tab" data-cat="hindi90">90s Hindi</button>
   <button class="tab" data-cat="favorites">★ Favorites</button>
-  <button class="tab" data-cat="jamendo">🎧 Ad-Free</button>
 </div>
 
 <div class="search-row">
@@ -387,7 +442,11 @@
     No favorites yet — while a song is playing, tap the star below to save it here.
   </div>
 
+  <div class="song-list-tools" id="songListTools" style="display:none;">
+    <input type="text" id="songFilterInput" placeholder="Filter loaded songs…" />
+  </div>
   <div class="song-list" id="songList" style="display:none;"></div>
+  <button class="pill-btn" id="loadMoreBtn" style="display:none; width:100%; margin-bottom:16px;">⬇️ Load 30 more songs</button>
   <div class="song-list-status" id="songListStatus" style="display:none;"></div>
 
   <div class="controls">
@@ -424,6 +483,7 @@
   };
 
   const FAV_KEY = 'satyam_music_favorites_v1';
+  const NAME_KEY = 'satyam_music_username';
   function getFavorites() { try { return JSON.parse(localStorage.getItem(FAV_KEY)) || []; } catch(e) { return []; } }
   function saveFavorites(list) { localStorage.setItem(FAV_KEY, JSON.stringify(list)); }
 
@@ -465,6 +525,9 @@
     searchHint: document.getElementById('searchHint'),
     songList: document.getElementById('songList'),
     songListStatus: document.getElementById('songListStatus'),
+    songListTools: document.getElementById('songListTools'),
+    songFilterInput: document.getElementById('songFilterInput'),
+    loadMoreBtn: document.getElementById('loadMoreBtn'),
     seekRow: document.getElementById('seekRow'),
     seekTrack: document.getElementById('seekTrack'),
     seekFill: document.getElementById('seekFill'),
@@ -665,8 +728,9 @@
     els.songListStatus.textContent = 'Loading songs…';
     els.songList.innerHTML = '';
 
+    const randomOffset = Math.floor(Math.random() * 400); // rotates through Jamendo's catalog instead of always the same fixed top tracks
     const url = 'https://api.jamendo.com/v3.0/tracks/?client_id=' + JAMENDO_CLIENT_ID +
-      '&format=json&limit=20&order=popularity_total&audioformat=mp32&include=musicinfo';
+      '&format=json&limit=20&offset=' + randomOffset + '&order=popularity_total&audioformat=mp31&include=musicinfo';
     fetch(url).then(r => r.json()).then(data => {
       if (requestId !== loadRequestId) return;
       jamendoTracks = (data.results || []).filter(t => t.audio);
@@ -790,9 +854,14 @@
   }
 
   // ---------- Song list (tap a specific song instead of guessing) ----------
+  let shownIndices = new Set(); // which playlist indices have already been loaded into the visible list
+  const BATCH_SIZE = 30;
+
   function hideSongList() {
     els.songList.style.display = 'none';
     els.songListStatus.style.display = 'none';
+    els.songListTools.style.display = 'none';
+    els.loadMoreBtn.style.display = 'none';
   }
 
   function fetchOEmbedTitle(videoId) {
@@ -809,20 +878,47 @@
     if (!playerReady || !player.getPlaylist) return;
     const list = player.getPlaylist();
     if (!list || !list.length) return;
-    const count = Math.min(10, list.length);
-    const idsToShow = list.slice(0, count);
 
+    shownIndices = new Set();
     els.songList.style.display = 'block';
-    els.songListStatus.style.display = 'block';
-    els.songListStatus.textContent = 'Loading song titles…';
+    els.songListTools.style.display = 'block';
+    els.songFilterInput.value = '';
     els.songList.innerHTML = '';
     els.title.textContent = 'Tap a song to play';
     els.meta.textContent = inSearchMode ? '' : (currentCategory === 'favorites' ? 'Favorites' : (PLAYLISTS[currentCategory] ? PLAYLISTS[currentCategory].name : ''));
 
+    loadMoreSongRows();
+  }
+
+  function loadMoreSongRows() {
+    if (!playerReady || !player.getPlaylist) return;
+    const list = player.getPlaylist();
+    if (!list || !list.length) return;
+
+    const available = [];
+    for (let i = 0; i < list.length; i++) if (!shownIndices.has(i)) available.push(i);
+    if (!available.length) { els.loadMoreBtn.style.display = 'none'; return; }
+
+    // Shuffle the remaining pool so each batch is a fresh random slice,
+    // then take up to BATCH_SIZE of them — across enough taps this lets
+    // you browse deep into a 300+ song playlist, not just the same 10.
+    for (let i = available.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [available[i], available[j]] = [available[j], available[i]];
+    }
+    const indices = available.slice(0, Math.min(BATCH_SIZE, available.length));
+    indices.forEach(i => shownIndices.add(i));
+
+    els.songListStatus.style.display = 'block';
+    els.songListStatus.textContent = 'Loading song titles…';
+    els.loadMoreBtn.style.display = 'none';
+
     const requestSnapshot = loadRequestId;
-    const lookups = idsToShow.map((id, i) => {
-      if (currentFavForList && currentFavForList[i]) {
-        return Promise.resolve({ title: currentFavForList[i].title, channel: '', thumb: 'https://i.ytimg.com/vi/' + id + '/default.jpg' });
+    const idsToShow = indices.map(i => list[i]);
+    const lookups = idsToShow.map((id, pos) => {
+      const realIndex = indices[pos];
+      if (currentFavForList && currentFavForList[realIndex]) {
+        return Promise.resolve({ title: currentFavForList[realIndex].title, channel: '', thumb: 'https://i.ytimg.com/vi/' + id + '/default.jpg' });
       }
       return fetchOEmbedTitle(id);
     });
@@ -830,25 +926,44 @@
     Promise.all(lookups).then(results => {
       if (requestSnapshot !== loadRequestId) return; // a newer tab switch superseded this
       els.songListStatus.style.display = 'none';
-      results.forEach((info, i) => {
+      results.forEach((info, pos) => {
+        const realIndex = indices[pos];
         const row = document.createElement('div');
         row.className = 'song-row';
+        row.dataset.title = (info.title || '').toLowerCase();
         row.innerHTML =
-          '<span class="song-row-num">' + (i + 1) + '</span>' +
+          '<span class="song-row-num">' + (shownIndices.size - indices.length + pos + 1) + '</span>' +
           '<img src="' + (info.thumb || '') + '" alt="">' +
           '<div class="song-row-text">' +
             '<div class="song-row-title">' + escapeHtml(info.title) + '</div>' +
             '<div class="song-row-channel">' + escapeHtml(info.channel || '') + '</div>' +
           '</div>';
         row.addEventListener('click', () => {
-          lastIndex = i;
+          lastIndex = realIndex;
           hideSongList();
-          player.playVideoAt(i);
+          player.playVideoAt(realIndex);
         });
         els.songList.appendChild(row);
       });
+
+      const remaining = list.length - shownIndices.size;
+      if (remaining > 0) {
+        els.loadMoreBtn.textContent = '⬇️ Load ' + Math.min(BATCH_SIZE, remaining) + ' more songs (' + remaining + ' left)';
+        els.loadMoreBtn.style.display = 'block';
+      } else {
+        els.loadMoreBtn.style.display = 'none';
+      }
     });
   }
+
+  els.loadMoreBtn.addEventListener('click', loadMoreSongRows);
+
+  els.songFilterInput.addEventListener('input', () => {
+    const q = els.songFilterInput.value.trim().toLowerCase();
+    document.querySelectorAll('.song-row').forEach(row => {
+      row.style.display = !q || row.dataset.title.includes(q) ? 'flex' : 'none';
+    });
+  });
 
   // ---------- Search (no API key — uses YouTube's own search page) ----------
   // Accepts a full YouTube link, a youtu.be short link, or a bare 11-char
@@ -975,7 +1090,9 @@
 
   // ---------- Video visibility toggle (see & skip YouTube ads manually) ----------
   const VIDEO_VISIBLE_KEY = 'satyam_video_visible';
-  let videoVisible = localStorage.getItem(VIDEO_VISIBLE_KEY) === 'true';
+  let videoVisible = localStorage.getItem(VIDEO_VISIBLE_KEY) !== null
+    ? localStorage.getItem(VIDEO_VISIBLE_KEY) === 'true'
+    : true; // default ON, so YouTube's own Skip Ad button is visible without an extra tap
 
   function applyVideoVisibility() {
     els.videoFrame.classList.toggle('visible', videoVisible);
@@ -1002,8 +1119,10 @@
     else { msg = 'Good Night'; icon = '🌙'; mood = 'night'; }
 
     const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const savedName = localStorage.getItem(NAME_KEY);
+    const namePart = savedName ? ', ' + savedName : '';
 
-    document.getElementById('greetingMsg').textContent = msg + ' — time for some music';
+    document.getElementById('greetingMsg').textContent = msg + namePart + ' — time for some music';
     document.getElementById('greetingDate').textContent = dateStr;
     document.getElementById('greetingIcon').textContent = icon;
     const card = document.getElementById('greetingCard');
@@ -1036,6 +1155,67 @@
     }
   }
   spawnFloatingNotes();
+
+  // ---------- Name gate (asked once) + random welcome wish (every visit) ----------
+
+  // 10 openers × 5 closers = 50 distinct combinations, each with a name slot and emoji.
+  const WISH_OPENERS = [
+    "Yo {name}! Satyam here — let's get this party started!",
+    "Hey buddy {name}! This is Satyam. Forget everything, it's go time!",
+    "{name}'s in the house! Satyam says hit that play button NOW!",
+    "Alright {name}, Satyam built this just for moments like right now!",
+    "{name}! Drop whatever you're doing — Satyam says it's music time!",
+    "Yooo {name}! From Satyam straight to your speakers!",
+    "Hey {name}, whatever's stressing you out — let the beat crush it!",
+    "{name}! Satyam's here, and this playlist is about to go OFF!",
+    "{name}, you found Sangeet — Satyam's energy zone, let's gooo!",
+    "Wake up, {name}! Satyam's calling — it's music o'clock, full volume!"
+  ];
+  const WISH_CLOSERS = [
+    "Let's turn it up! 🔥",
+    "Time to vibe hard! 🎧",
+    "Music mode: ON! ⚡",
+    "Let's make some noise! 🙌",
+    "Full volume, let's go! 💥"
+  ];
+
+  function pickRandomWish(name) {
+    const opener = WISH_OPENERS[Math.floor(Math.random() * WISH_OPENERS.length)];
+    const closer = WISH_CLOSERS[Math.floor(Math.random() * WISH_CLOSERS.length)];
+    return opener.replace('{name}', name) + ' ' + closer;
+  }
+
+  function showWelcomeToast(name) {
+    const toast = document.getElementById('welcomeToast');
+    toast.textContent = pickRandomWish(name);
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 5000);
+  }
+
+  function initNameGate() {
+    const savedName = localStorage.getItem(NAME_KEY);
+    if (savedName) {
+      showWelcomeToast(savedName);
+      return;
+    }
+    document.getElementById('nameModalOverlay').classList.add('open');
+  }
+
+  document.getElementById('nameSubmitBtn').addEventListener('click', () => {
+    const input = document.getElementById('nameInput');
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    localStorage.setItem(NAME_KEY, name);
+    document.getElementById('nameModalOverlay').classList.remove('open');
+    renderGreeting();
+    showWelcomeToast(name);
+  });
+  document.getElementById('nameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('nameSubmitBtn').click();
+  });
+
+  initNameGate();
+
 </script>
 </body>
 </html>
