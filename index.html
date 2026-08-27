@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -150,7 +151,6 @@
   .tab:not(.active):hover{ color:var(--text); background:rgba(255,255,255,0.04); }
   /* Colorful per-genre tabs, like the multi-hued buttons on your library app */
   .tab[data-cat="english"].active{ background:linear-gradient(135deg, #5AA9E6, #2E7FC7); color:#06141f; }
-  .tab[data-cat="bhojpuri"].active{ background:linear-gradient(135deg, #F0954A, #D9722A); color:#241205; }
   .tab[data-cat="bollywood"].active{ background:linear-gradient(135deg, #EC5FA0, #C93E7E); color:#22060f; }
   .tab[data-cat="bollynew"].active{ background:linear-gradient(135deg, #F45C5C, #C93030); color:#240707; }
   .tab[data-cat="hindi90"].active{ background:linear-gradient(135deg, #9C7BE0, #7A54C4); color:#150a2c; }
@@ -173,11 +173,63 @@
     0%, 100%{ box-shadow:0 30px 60px -25px rgba(0,0,0,0.7), 0 0 0 rgba(201,162,39,0); }
     50%{ box-shadow:0 30px 60px -25px rgba(0,0,0,0.7), 0 0 30px rgba(201,162,39,0.18); }
   }
+  .player-card.tab-flash{ animation: tabFlash .6s ease; }
+  @keyframes tabFlash{
+    0%{ box-shadow:0 30px 60px -25px rgba(0,0,0,0.7), 0 0 0 rgba(0,0,0,0); }
+    40%{ box-shadow:0 30px 60px -25px rgba(0,0,0,0.7), 0 0 44px var(--tab-color, rgba(201,162,39,0.4)); }
+    100%{ box-shadow:0 30px 60px -25px rgba(0,0,0,0.7), 0 0 0 rgba(0,0,0,0); }
+  }
+
+  /* Tab-switching overlay — a quick themed flash of icon + label whenever a tab is tapped */
+  .tab-switch-overlay{
+    position:absolute; inset:0; z-index:6; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:10px; border-radius:22px;
+    background:rgba(7,11,19,0.86); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    opacity:0; pointer-events:none; transition:opacity .22s ease;
+  }
+  .tab-switch-overlay.show{ opacity:1; }
+  .tab-switch-overlay.show .tab-switch-icon{ animation:tabIconPop .5s cubic-bezier(.34,1.56,.64,1); }
+  .tab-switch-overlay.show .tab-switch-label{ animation:tabLabelIn .45s ease .06s both; }
+  .tab-switch-icon{
+    font-size:52px; filter:drop-shadow(0 8px 18px rgba(0,0,0,0.55));
+  }
+  .tab-switch-label{
+    font-family:'Fraunces',serif; font-weight:800; font-size:14.5px; letter-spacing:0.08em;
+    text-transform:uppercase; color:var(--tab-color, var(--gold-bright));
+  }
+  .tab-switch-bar{
+    width:64px; height:3px; border-radius:999px; margin-top:2px; overflow:hidden;
+    background:rgba(255,255,255,0.08);
+  }
+  .tab-switch-bar::after{
+    content:''; display:block; height:100%; width:0%; border-radius:999px;
+    background:var(--tab-color, var(--gold)); animation:tabBarFill .55s ease forwards;
+  }
+  @keyframes tabIconPop{
+    0%{ transform:scale(.25) rotate(-18deg); opacity:0; }
+    55%{ transform:scale(1.18) rotate(6deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0deg); opacity:1; }
+  }
+  @keyframes tabLabelIn{
+    from{ opacity:0; transform:translateY(6px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  @keyframes tabBarFill{
+    from{ width:0%; }
+    to{ width:100%; }
+  }
 
   /* Vinyl */
-  .vinyl-wrap{ display:flex; justify-content:center; margin-bottom:20px; }
+  .vinyl-wrap{ display:flex; justify-content:center; margin-bottom:20px; position:relative; }
+  .vinyl-wrap::before{
+    content:''; position:absolute; left:50%; top:50%; width:220px; height:220px;
+    transform:translate(-50%,-50%); border-radius:50%; z-index:0;
+    background:radial-gradient(circle, var(--tab-color, var(--gold)) 0%, transparent 70%);
+    opacity:0.28; filter:blur(22px); transition:background .5s ease, opacity .5s ease;
+    pointer-events:none;
+  }
   .vinyl{
-    width:168px; height:168px; border-radius:50%; position:relative;
+    width:168px; height:168px; border-radius:50%; position:relative; z-index:1;
     background:
       repeating-radial-gradient(circle at 50% 50%, #1a2438 0px, #1a2438 2px, #0d1524 3px, #0d1524 4px);
     box-shadow: inset 0 0 0 1px rgba(201,162,39,0.25), 0 10px 30px rgba(0,0,0,0.5);
@@ -198,7 +250,6 @@
     transition:background .4s;
   }
   .vinyl-label.c-english{ background:radial-gradient(circle at 35% 30%, #82c3f2, #2E7FC7 55%, #16456f 100%); }
-  .vinyl-label.c-bhojpuri{ background:radial-gradient(circle at 35% 30%, #f7b784, #D9722A 55%, #7a3d12 100%); }
   .vinyl-label.c-bollywood{ background:radial-gradient(circle at 35% 30%, #f5a1c8, #C93E7E 55%, #6e1f45 100%); }
   .vinyl-label.c-bollynew{ background:radial-gradient(circle at 35% 30%, #f79b9b, #C93030 55%, #6b1414 100%); }
   .vinyl-label.c-hindi90{ background:radial-gradient(circle at 35% 30%, #c3aef0, #7A54C4 55%, #3f2b6d 100%); }
@@ -392,16 +443,15 @@
 <header>
   <div class="eyebrow">Endless Shuffle</div>
   <h1>Sangeet</h1>
-  <div class="sub">English · Bhojpuri · Bollywood · 90s Hindi</div>
+  <div class="sub">English · Bollywood · 90s Hindi</div>
 </header>
 
 <div class="tabs" id="tabs">
   <button class="tab" data-cat="jamendo">🎧 Ad-Free</button>
-  <button class="tab active" data-cat="english">English</button>
-  <button class="tab" data-cat="bhojpuri">Bhojpuri</button>
-  <button class="tab" data-cat="bollywood">Bollywood</button>
-  <button class="tab" data-cat="bollynew">New Bollywood</button>
-  <button class="tab" data-cat="hindi90">90s Hindi</button>
+  <button class="tab active" data-cat="english">🇬🇧 English</button>
+  <button class="tab" data-cat="bollywood">🎬 Bollywood</button>
+  <button class="tab" data-cat="bollynew">✨ New Bollywood</button>
+  <button class="tab" data-cat="hindi90">📻 90s Hindi</button>
   <button class="tab" data-cat="favorites">★ Favorites</button>
 </div>
 
@@ -412,6 +462,11 @@
 <div class="search-hint" id="searchHint" style="display:none;"></div>
 
 <div class="player-card">
+  <div class="tab-switch-overlay" id="tabSwitchOverlay">
+    <div class="tab-switch-icon" id="tabSwitchIcon">🇬🇧</div>
+    <div class="tab-switch-label" id="tabSwitchLabel">English</div>
+    <div class="tab-switch-bar" id="tabSwitchBar"></div>
+  </div>
   <div class="vinyl-wrap">
     <div class="vinyl" id="vinyl">
       <div class="vinyl-label" id="vinylLabel">♪</div>
@@ -477,11 +532,52 @@
   // never runs out, and shuffle picks a genuinely random track every time.
   const PLAYLISTS = {
     english:     { name: 'English',        list: 'PLPSCssPYXhWTTcpNZwYoEQWt8Wc8KO0NV' },
-    bhojpuri:    { name: 'Bhojpuri',       list: 'PLNz4YQwT4-GKHmRJq--M9pnuBFlQWhkaw' },
     bollywood:   { name: 'Bollywood',      list: 'PLVPrO2TUSZdTwyg4z7Yw17A3Lly_ELWwy' },
     bollynew:    { name: 'New Bollywood',  list: 'PLO7-VO1D0_6NmK47v6tpOcxurcxdW-hZa' },
     hindi90:     { name: '90s Hindi',      list: 'PLcggtav10zeqaqM2nFaXkjCJe9cFYnZS0' },
   };
+
+  // Icon + accent color per tab — drives the "switching tab" flash overlay,
+  // the tab-flash glow on the player card, and the ambient glow behind the vinyl.
+  const CAT_META = {
+    jamendo:   { icon: '🎧', label: 'Ad-Free',       color: '#4FD68C' },
+    english:   { icon: '🇬🇧', label: 'English',       color: '#5AA9E6' },
+    bollywood: { icon: '🎬', label: 'Bollywood',     color: '#EC5FA0' },
+    bollynew:  { icon: '✨', label: 'New Bollywood', color: '#F45C5C' },
+    hindi90:   { icon: '📻', label: '90s Hindi',      color: '#9C7BE0' },
+    favorites: { icon: '★',  label: 'Favorites',     color: '#F4C93E' },
+  };
+
+  // Plays the "switching tab" flash: a themed icon + label pop over the
+  // player card, a brief colored glow on the card, and recolors the ambient
+  // glow behind the vinyl to match — purely visual, never touches playback.
+  function playTabSwitchAnimation(cat) {
+    const meta = CAT_META[cat];
+    if (!meta) return;
+    const overlay = document.getElementById('tabSwitchOverlay');
+    const card = document.querySelector('.player-card');
+    document.getElementById('tabSwitchIcon').textContent = meta.icon;
+    document.getElementById('tabSwitchLabel').textContent = meta.label;
+    const bar = document.getElementById('tabSwitchBar');
+
+    [overlay, card, document.querySelector('.vinyl-wrap')].forEach(el => {
+      if (el) el.style.setProperty('--tab-color', meta.color);
+    });
+
+    overlay.classList.remove('show');
+    card.classList.remove('tab-flash');
+    bar.style.animation = 'none';
+    void overlay.offsetWidth; // restart CSS animations
+    overlay.classList.add('show');
+    card.classList.add('tab-flash');
+    bar.style.animation = '';
+
+    clearTimeout(overlay._hideTimer);
+    overlay._hideTimer = setTimeout(() => {
+      overlay.classList.remove('show');
+      card.classList.remove('tab-flash');
+    }, 550);
+  }
 
   const FAV_KEY = 'satyam_music_favorites_v1';
   const NAME_KEY = 'satyam_music_username';
@@ -807,6 +903,7 @@
     activePlaylistKey = cat;
     lastIndex = index;
     document.getElementById('vinylLabel').className = 'vinyl-label c-' + cat;
+    if (CAT_META[cat]) document.querySelector('.vinyl-wrap').style.setProperty('--tab-color', CAT_META[cat].color);
     hideSongList();
   }
 
@@ -849,6 +946,7 @@
     hideSongList();
     els.videoFrame.style.display = 'none';
     document.getElementById('vinylLabel').className = 'vinyl-label c-jamendo';
+    document.querySelector('.vinyl-wrap').style.setProperty('--tab-color', CAT_META.jamendo.color);
     jamendoAudio.src = t.audio;
     jamendoAudio.play();
     els.title.textContent = t.name;
@@ -1081,6 +1179,7 @@
     if (!btn) return;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
+    playTabSwitchAnimation(btn.dataset.cat);
     loadCategory(btn.dataset.cat);
   });
 
