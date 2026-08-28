@@ -547,15 +547,14 @@
     bollywood:   { name: 'Bollywood',      list: 'PLVPrO2TUSZdTwyg4z7Yw17A3Lly_ELWwy' },
     bollynew:    { name: 'New Bollywood',  list: 'PLO7-VO1D0_6NmK47v6tpOcxurcxdW-hZa' },
     hindi90:     { name: '90s Hindi',      list: 'PLcggtav10zeqaqM2nFaXkjCJe9cFYnZS0' },
-    // These use a live YouTube *search* instead of a fixed playlist ID
-    // (listType:'search' is a real, documented IFrame API mode) — that way
-    // they always resolve to real, currently-available videos rather than
-    // pointing at a specific playlist ID that could someday go private/deleted.
-    punjabi:     { name: 'Punjabi',        list: 'punjabi hit songs bhangra',      listType: 'search' },
-    lofi:        { name: 'Lo-Fi Chill',    list: 'lofi hindi bollywood chill mix', listType: 'search' },
-    bhakti:      { name: 'Aarti & Bhakti', list: 'aarti bhajan devotional hindi songs', listType: 'search' },
-    // 'festival' has no fixed entry here — its name/query are computed live
-    // by getPlaylistMeta() based on whichever festival is current/nearest.
+    // list: null means "not wired up to a real playlist yet" — the tab shows
+    // a friendly prompt instead of guessing, rather than silently failing.
+    // (YouTube's IFrame API no longer supports loading a playlist by live
+    // search — only a real playlist ID or an array of video IDs actually
+    // works now — so these need a real YouTube playlist link pasted in.)
+    punjabi:     { name: 'Punjabi',        list: null },
+    lofi:        { name: 'Lo-Fi Chill',    list: null },
+    bhakti:      { name: 'Aarti & Bhakti', list: null },
   };
 
   // Icon + accent color per tab — drives the "switching tab" flash overlay,
@@ -573,21 +572,24 @@
     // 'festival' isn't listed here — see getCatMeta() below.
   };
 
-  // Major Hindu festivals through the year, each with its own search query,
-  // icon and color. Dates are pinned to 2026 — most of these follow the
-  // lunar calendar so they drift by a few days in other years, but stay
-  // close enough for picking "what festival is it around now".
+  // Major Hindu festivals through the year, each with its own icon and color.
+  // 'list' is null until a real YouTube playlist ID is wired in per festival
+  // (see the note above PLAYLISTS about why live search no longer works) —
+  // until then the tab shows a friendly "add a playlist" prompt instead of
+  // guessing or showing stale content. Dates are pinned to 2026 — most of
+  // these follow the lunar calendar so they drift a few days in other years,
+  // but stay close enough for picking "what festival is it around now".
   const FESTIVALS = [
-    { name: 'New Year',         month: 1,  day: 1,  icon: '🎆', query: 'happy new year bollywood party songs', color: '#4FD68C' },
-    { name: 'Makar Sankranti',  month: 1,  day: 14, icon: '🪁', query: 'makar sankranti lohri pongal songs',   color: '#F2B705' },
-    { name: 'Maha Shivratri',   month: 2,  day: 15, icon: '🔱', query: 'maha shivratri shiv bhajan songs',     color: '#5AA9E6' },
-    { name: 'Holi',             month: 3,  day: 4,  icon: '🎨', query: 'holi songs bollywood',                 color: '#FF4FA3' },
-    { name: 'Raksha Bandhan',   month: 8,  day: 28, icon: '🎗️', query: 'raksha bandhan rakhi songs',           color: '#F45C5C' },
-    { name: 'Janmashtami',      month: 9,  day: 4,  icon: '🦚', query: 'krishna janmashtami bhajan songs',     color: '#3E7CD6' },
-    { name: 'Ganesh Chaturthi', month: 9,  day: 7,  icon: '🐘', query: 'ganesh chaturthi ganpati songs',       color: '#E8622C' },
-    { name: 'Navratri',         month: 9,  day: 22, icon: '💃', query: 'navratri garba dandiya songs',         color: '#C93E7E' },
-    { name: 'Dussehra',         month: 10, day: 2,  icon: '🏹', query: 'dussehra vijayadashami songs',         color: '#D9722A' },
-    { name: 'Diwali',           month: 11, day: 8,  icon: '🪔', query: 'diwali songs bollywood',               color: '#F4C93E' },
+    { name: 'New Year',         month: 1,  day: 1,  icon: '🎆', list: null, color: '#4FD68C' },
+    { name: 'Makar Sankranti',  month: 1,  day: 14, icon: '🪁', list: null, color: '#F2B705' },
+    { name: 'Maha Shivratri',   month: 2,  day: 15, icon: '🔱', list: null, color: '#5AA9E6' },
+    { name: 'Holi',             month: 3,  day: 4,  icon: '🎨', list: null, color: '#FF4FA3' },
+    { name: 'Raksha Bandhan',   month: 8,  day: 28, icon: '🎗️', list: null, color: '#F45C5C' },
+    { name: 'Janmashtami',      month: 9,  day: 4,  icon: '🦚', list: null, color: '#3E7CD6' },
+    { name: 'Ganesh Chaturthi', month: 9,  day: 7,  icon: '🐘', list: null, color: '#E8622C' },
+    { name: 'Navratri',         month: 9,  day: 22, icon: '💃', list: null, color: '#C93E7E' },
+    { name: 'Dussehra',         month: 10, day: 2,  icon: '🏹', list: null, color: '#D9722A' },
+    { name: 'Diwali',           month: 11, day: 8,  icon: '🪔', list: null, color: '#F4C93E' },
   ];
 
   // Picks whichever festival is happening now (within a few days' grace
@@ -625,7 +627,7 @@
   function getPlaylistMeta(cat) {
     if (cat === 'festival') {
       const { festival } = getCurrentFestival();
-      return { name: festival.name, list: festival.query, listType: 'search' };
+      return { name: festival.name, list: festival.list };
     }
     return PLAYLISTS[cat];
   }
@@ -931,38 +933,42 @@
     if (!browsePlayerReady) return; // browsePlayer's own onReady will call loadCategory(currentCategory) once it's up
 
     const pl = getPlaylistMeta(cat);
-    const listType = pl.listType || 'playlist';
-    // For search-based tabs we can't match by playlist ID (there isn't one),
-    // so capture what's currently loaded and wait for it to actually change.
-    const prevList = (browsePlayer.getPlaylist && browsePlayer.getPlaylist()) || [];
-    browsePlayer.cuePlaylist({ listType: listType, list: pl.list });
+
+    // No real playlist wired up for this tab yet — show a clear, honest
+    // prompt instead of calling the YouTube API with nothing (which used to
+    // silently leave whatever the previous tab loaded still on screen).
+    if (!pl.list) {
+      els.songList.style.display = 'block';
+      els.songListStatus.style.display = 'block';
+      els.songListStatus.textContent = '';
+      els.songList.innerHTML =
+        '<div style="padding:22px 16px;text-align:center;color:var(--muted,#9aa4b2);font-size:14px;line-height:1.6;">' +
+          '🎵 No playlist linked for <strong style="color:var(--text,#fff);">' + escapeHtml(pl.name) + '</strong> yet.<br>' +
+          'Paste a YouTube playlist link for this tab and it\'ll show up here.' +
+        '</div>';
+      return;
+    }
+
+    browsePlayer.cuePlaylist({ listType: 'playlist', list: pl.list });
     els.songList.style.display = 'block';
     els.songListStatus.style.display = 'block';
     els.songListStatus.textContent = 'Loading ' + pl.name + ' songs…';
     els.songList.innerHTML = '';
-    waitForBrowsePlaylistThenList(myRequestId, pl.list, 0, listType, prevList);
+    waitForBrowsePlaylistThenList(myRequestId, pl.list, 0);
   }
 
   // Polls the hidden browse player until it's actually finished loading the
-  // intended playlist (verified via getPlaylistId for fixed playlists, or via
-  // a changed video list for search-based tabs) — this is what prevents
+  // intended playlist (verified via getPlaylistId) — this is what prevents
   // a previous tab's songs from showing under a new tab's name, without
   // ever touching the main player that's actually playing something.
-  function waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt, listType, prevList) {
+  function waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt) {
     if (requestId !== loadRequestId) return; // a newer tab switch has already superseded this one
     if (!browsePlayerReady || !browsePlayer.getPlaylist) return;
 
     const list = browsePlayer.getPlaylist();
-    let ready;
-    if (listType === 'search') {
-      const changed = !prevList || !prevList.length || list.join(',') !== prevList.join(',');
-      ready = !!(list && list.length && changed);
-    } else {
-      const idMatches = browsePlayer.getPlaylistId && browsePlayer.getPlaylistId() === expectedPlaylistId;
-      ready = !!(list && list.length && idMatches);
-    }
+    const idMatches = browsePlayer.getPlaylistId && browsePlayer.getPlaylistId() === expectedPlaylistId;
 
-    if (ready) {
+    if (list && list.length && idMatches) {
       currentBrowseIds = list;
       browsePlaylistReady = true;
       showSongListForCurrentPlaylist();
@@ -975,13 +981,14 @@
       els.songListStatus.textContent = 'Could not load this playlist — check your internet connection';
       return;
     }
-    setTimeout(() => waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt + 1, listType, prevList), 400);
+    setTimeout(() => waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt + 1), 400);
   }
 
   // The one place that actually starts/switches what's playing. Called when
   // you tap a specific song, tap Shuffle, or tap Play with nothing chosen yet.
   function activatePlaylist(cat, index) {
     if (!playerReady) return;
+    if (!getPlaylistMeta(cat).list && cat !== 'favorites') return; // nothing to play yet for this tab
     if (mediaMode === 'jamendo') jamendoAudio.pause();
     els.videoFrame.style.display = 'block';
 
@@ -992,7 +999,7 @@
       player.loadPlaylist({ playlist: currentBrowseIds, index });
     } else {
       const pl = getPlaylistMeta(cat);
-      player.loadPlaylist({ listType: pl.listType || 'playlist', list: pl.list, index });
+      player.loadPlaylist({ listType: 'playlist', list: pl.list, index });
     }
     mediaMode = 'youtube';
     activePlaylistKey = cat;
