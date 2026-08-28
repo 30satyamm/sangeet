@@ -152,6 +152,10 @@
   /* Colorful per-genre tabs, like the multi-hued buttons on your library app */
   .tab[data-cat="english"].active{ background:linear-gradient(135deg, #5AA9E6, #2E7FC7); color:#06141f; }
   .tab[data-cat="bollywood"].active{ background:linear-gradient(135deg, #EC5FA0, #C93E7E); color:#22060f; }
+  .tab[data-cat="punjabi"].active{ background:linear-gradient(135deg, #FFAA5C, #FF8A3D); color:#241205; }
+  .tab[data-cat="lofi"].active{ background:linear-gradient(135deg, #8E9CFF, #6C7BFF); color:#0c0f2b; }
+  .tab[data-cat="bhakti"].active{ background:linear-gradient(135deg, #FFD966, #F2B705); color:#2b2003; }
+  .tab[data-cat="festival"].active{ background:linear-gradient(135deg, #FFCB6B, #F4C93E, #EC5FA0); color:#241205; }
   .tab[data-cat="bollynew"].active{ background:linear-gradient(135deg, #F45C5C, #C93030); color:#240707; }
   .tab[data-cat="hindi90"].active{ background:linear-gradient(135deg, #9C7BE0, #7A54C4); color:#150a2c; }
   .tab[data-cat="favorites"].active{ background:linear-gradient(135deg, #F4C93E, #D9A61E); color:#241b04; }
@@ -251,6 +255,10 @@
   }
   .vinyl-label.c-english{ background:radial-gradient(circle at 35% 30%, #82c3f2, #2E7FC7 55%, #16456f 100%); }
   .vinyl-label.c-bollywood{ background:radial-gradient(circle at 35% 30%, #f5a1c8, #C93E7E 55%, #6e1f45 100%); }
+  .vinyl-label.c-punjabi{ background:radial-gradient(circle at 35% 30%, #ffc48a, #FF8A3D 55%, #8a3f0f 100%); }
+  .vinyl-label.c-lofi{ background:radial-gradient(circle at 35% 30%, #b7bfff, #6C7BFF 55%, #2e378f 100%); }
+  .vinyl-label.c-bhakti{ background:radial-gradient(circle at 35% 30%, #ffe38a, #F2B705 55%, #7a5a03 100%); }
+  .vinyl-label.c-festival{ background:radial-gradient(circle at 35% 30%, #ffdb8a, #F4C93E 55%, #a5470f 100%); }
   .vinyl-label.c-bollynew{ background:radial-gradient(circle at 35% 30%, #f79b9b, #C93030 55%, #6b1414 100%); }
   .vinyl-label.c-hindi90{ background:radial-gradient(circle at 35% 30%, #c3aef0, #7A54C4 55%, #3f2b6d 100%); }
   .vinyl-label.c-jamendo{ background:radial-gradient(circle at 35% 30%, #8ee6b3, #23A866 55%, #0f5c37 100%); }
@@ -443,7 +451,7 @@
 <header>
   <div class="eyebrow">Endless Shuffle</div>
   <h1>Sangeet</h1>
-  <div class="sub">English · Bollywood · 90s Hindi</div>
+  <div class="sub">English · Bollywood · Punjabi · Bhakti · Festival Specials</div>
 </header>
 
 <div class="tabs" id="tabs">
@@ -452,6 +460,10 @@
   <button class="tab" data-cat="bollywood">🎬 Bollywood</button>
   <button class="tab" data-cat="bollynew">✨ New Bollywood</button>
   <button class="tab" data-cat="hindi90">📻 90s Hindi</button>
+  <button class="tab" data-cat="punjabi">🥁 Punjabi</button>
+  <button class="tab" data-cat="lofi">🌙 Lo-Fi Chill</button>
+  <button class="tab" data-cat="bhakti">🙏 Aarti Bhakti</button>
+  <button class="tab" data-cat="festival">🎉 Festival</button>
   <button class="tab" data-cat="favorites">★ Favorites</button>
 </div>
 
@@ -535,6 +547,15 @@
     bollywood:   { name: 'Bollywood',      list: 'PLVPrO2TUSZdTwyg4z7Yw17A3Lly_ELWwy' },
     bollynew:    { name: 'New Bollywood',  list: 'PLO7-VO1D0_6NmK47v6tpOcxurcxdW-hZa' },
     hindi90:     { name: '90s Hindi',      list: 'PLcggtav10zeqaqM2nFaXkjCJe9cFYnZS0' },
+    // These use a live YouTube *search* instead of a fixed playlist ID
+    // (listType:'search' is a real, documented IFrame API mode) — that way
+    // they always resolve to real, currently-available videos rather than
+    // pointing at a specific playlist ID that could someday go private/deleted.
+    punjabi:     { name: 'Punjabi',        list: 'punjabi hit songs bhangra',      listType: 'search' },
+    lofi:        { name: 'Lo-Fi Chill',    list: 'lofi hindi bollywood chill mix', listType: 'search' },
+    bhakti:      { name: 'Aarti & Bhakti', list: 'aarti bhajan devotional hindi songs', listType: 'search' },
+    // 'festival' has no fixed entry here — its name/query are computed live
+    // by getPlaylistMeta() based on whichever festival is current/nearest.
   };
 
   // Icon + accent color per tab — drives the "switching tab" flash overlay,
@@ -545,14 +566,75 @@
     bollywood: { icon: '🎬', label: 'Bollywood',     color: '#EC5FA0' },
     bollynew:  { icon: '✨', label: 'New Bollywood', color: '#F45C5C' },
     hindi90:   { icon: '📻', label: '90s Hindi',      color: '#9C7BE0' },
+    punjabi:   { icon: '🥁', label: 'Punjabi',        color: '#FF8A3D' },
+    lofi:      { icon: '🌙', label: 'Lo-Fi Chill',    color: '#6C7BFF' },
+    bhakti:    { icon: '🙏', label: 'Aarti & Bhakti', color: '#F2B705' },
     favorites: { icon: '★',  label: 'Favorites',     color: '#F4C93E' },
+    // 'festival' isn't listed here — see getCatMeta() below.
   };
+
+  // Major Hindu festivals through the year, each with its own search query,
+  // icon and color. Dates are pinned to 2026 — most of these follow the
+  // lunar calendar so they drift by a few days in other years, but stay
+  // close enough for picking "what festival is it around now".
+  const FESTIVALS = [
+    { name: 'New Year',         month: 1,  day: 1,  icon: '🎆', query: 'happy new year bollywood party songs', color: '#4FD68C' },
+    { name: 'Makar Sankranti',  month: 1,  day: 14, icon: '🪁', query: 'makar sankranti lohri pongal songs',   color: '#F2B705' },
+    { name: 'Maha Shivratri',   month: 2,  day: 15, icon: '🔱', query: 'maha shivratri shiv bhajan songs',     color: '#5AA9E6' },
+    { name: 'Holi',             month: 3,  day: 4,  icon: '🎨', query: 'holi songs bollywood',                 color: '#FF4FA3' },
+    { name: 'Raksha Bandhan',   month: 8,  day: 28, icon: '🎗️', query: 'raksha bandhan rakhi songs',           color: '#F45C5C' },
+    { name: 'Janmashtami',      month: 9,  day: 4,  icon: '🦚', query: 'krishna janmashtami bhajan songs',     color: '#3E7CD6' },
+    { name: 'Ganesh Chaturthi', month: 9,  day: 7,  icon: '🐘', query: 'ganesh chaturthi ganpati songs',       color: '#E8622C' },
+    { name: 'Navratri',         month: 9,  day: 22, icon: '💃', query: 'navratri garba dandiya songs',         color: '#C93E7E' },
+    { name: 'Dussehra',         month: 10, day: 2,  icon: '🏹', query: 'dussehra vijayadashami songs',         color: '#D9722A' },
+    { name: 'Diwali',           month: 11, day: 8,  icon: '🪔', query: 'diwali songs bollywood',               color: '#F4C93E' },
+  ];
+
+  // Picks whichever festival is happening now (within a few days' grace
+  // after its date) or otherwise the soonest upcoming one — this is what
+  // makes the Festival tab automatically become "Holi" in March, "Diwali"
+  // in November, "Janmashtami" in September, and so on, all on its own.
+  function getCurrentFestival() {
+    const today = new Date();
+    const y = today.getFullYear();
+    let best = FESTIVALS[0], bestDiff = Infinity;
+    FESTIVALS.forEach(f => {
+      [y - 1, y, y + 1].forEach(yr => {
+        const d = new Date(yr, f.month - 1, f.day);
+        const diffDays = Math.round((d - today) / 86400000);
+        if (diffDays >= -4 && diffDays < bestDiff) {
+          bestDiff = diffDays;
+          best = f;
+        }
+      });
+    });
+    return { festival: best, daysUntil: bestDiff };
+  }
+
+  // Wraps CAT_META/PLAYLISTS so the 'festival' tab resolves live instead of
+  // needing a fixed entry — everywhere else in the app can keep treating it
+  // like any other tab.
+  function getCatMeta(cat) {
+    if (cat === 'festival') {
+      const { festival } = getCurrentFestival();
+      return { icon: festival.icon, label: festival.name, color: festival.color };
+    }
+    return CAT_META[cat];
+  }
+
+  function getPlaylistMeta(cat) {
+    if (cat === 'festival') {
+      const { festival } = getCurrentFestival();
+      return { name: festival.name, list: festival.query, listType: 'search' };
+    }
+    return PLAYLISTS[cat];
+  }
 
   // Plays the "switching tab" flash: a themed icon + label pop over the
   // player card, a brief colored glow on the card, and recolors the ambient
   // glow behind the vinyl to match — purely visual, never touches playback.
   function playTabSwitchAnimation(cat) {
-    const meta = CAT_META[cat];
+    const meta = getCatMeta(cat);
     if (!meta) return;
     const overlay = document.getElementById('tabSwitchOverlay');
     const card = document.querySelector('.player-card');
@@ -848,27 +930,39 @@
     currentFavForList = null;
     if (!browsePlayerReady) return; // browsePlayer's own onReady will call loadCategory(currentCategory) once it's up
 
-    const pl = PLAYLISTS[cat];
-    browsePlayer.cuePlaylist({ listType: 'playlist', list: pl.list });
+    const pl = getPlaylistMeta(cat);
+    const listType = pl.listType || 'playlist';
+    // For search-based tabs we can't match by playlist ID (there isn't one),
+    // so capture what's currently loaded and wait for it to actually change.
+    const prevList = (browsePlayer.getPlaylist && browsePlayer.getPlaylist()) || [];
+    browsePlayer.cuePlaylist({ listType: listType, list: pl.list });
     els.songList.style.display = 'block';
     els.songListStatus.style.display = 'block';
     els.songListStatus.textContent = 'Loading ' + pl.name + ' songs…';
     els.songList.innerHTML = '';
-    waitForBrowsePlaylistThenList(myRequestId, pl.list, 0);
+    waitForBrowsePlaylistThenList(myRequestId, pl.list, 0, listType, prevList);
   }
 
   // Polls the hidden browse player until it's actually finished loading the
-  // intended playlist (verified via getPlaylistId) — this is what prevents
+  // intended playlist (verified via getPlaylistId for fixed playlists, or via
+  // a changed video list for search-based tabs) — this is what prevents
   // a previous tab's songs from showing under a new tab's name, without
   // ever touching the main player that's actually playing something.
-  function waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt) {
+  function waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt, listType, prevList) {
     if (requestId !== loadRequestId) return; // a newer tab switch has already superseded this one
     if (!browsePlayerReady || !browsePlayer.getPlaylist) return;
 
     const list = browsePlayer.getPlaylist();
-    const idMatches = browsePlayer.getPlaylistId && browsePlayer.getPlaylistId() === expectedPlaylistId;
+    let ready;
+    if (listType === 'search') {
+      const changed = !prevList || !prevList.length || list.join(',') !== prevList.join(',');
+      ready = !!(list && list.length && changed);
+    } else {
+      const idMatches = browsePlayer.getPlaylistId && browsePlayer.getPlaylistId() === expectedPlaylistId;
+      ready = !!(list && list.length && idMatches);
+    }
 
-    if (list && list.length && idMatches) {
+    if (ready) {
       currentBrowseIds = list;
       browsePlaylistReady = true;
       showSongListForCurrentPlaylist();
@@ -881,7 +975,7 @@
       els.songListStatus.textContent = 'Could not load this playlist — check your internet connection';
       return;
     }
-    setTimeout(() => waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt + 1), 400);
+    setTimeout(() => waitForBrowsePlaylistThenList(requestId, expectedPlaylistId, attempt + 1, listType, prevList), 400);
   }
 
   // The one place that actually starts/switches what's playing. Called when
@@ -897,13 +991,15 @@
     } else if (cat === 'favorites') {
       player.loadPlaylist({ playlist: currentBrowseIds, index });
     } else {
-      player.loadPlaylist({ listType: 'playlist', list: PLAYLISTS[cat].list, index });
+      const pl = getPlaylistMeta(cat);
+      player.loadPlaylist({ listType: pl.listType || 'playlist', list: pl.list, index });
     }
     mediaMode = 'youtube';
     activePlaylistKey = cat;
     lastIndex = index;
     document.getElementById('vinylLabel').className = 'vinyl-label c-' + cat;
-    if (CAT_META[cat]) document.querySelector('.vinyl-wrap').style.setProperty('--tab-color', CAT_META[cat].color);
+    const meta = getCatMeta(cat);
+    if (meta) document.querySelector('.vinyl-wrap').style.setProperty('--tab-color', meta.color);
     hideSongList();
   }
 
@@ -1182,6 +1278,16 @@
     playTabSwitchAnimation(btn.dataset.cat);
     loadCategory(btn.dataset.cat);
   });
+
+  // The Festival tab's label isn't hardcoded — it shows whichever festival
+  // is current or coming up next (Holi in March, Janmashtami/Ganesh
+  // Chaturthi in September, Diwali in November, etc.) as soon as the page loads.
+  (function updateFestivalTabLabel() {
+    const btn = document.querySelector('.tab[data-cat="festival"]');
+    if (!btn) return;
+    const meta = getCatMeta('festival');
+    btn.textContent = meta.icon + ' ' + meta.label;
+  })();
 
   // Play/pause button — toggles whatever is ACTIVELY playing, regardless of
   // which tab you're browsing. If nothing has played yet, starts a random
